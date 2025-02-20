@@ -17,8 +17,11 @@
 对于该源不存在的视频资源，批站也会强制分配新的节点，会导致选了也是白选。
 
 
-## 项目地址
+## 插件下载地址
 https://greasyfork.org/zh-CN/scripts/527498-custom-cdn-of-bilibili-ccb-%E4%BF%AE%E6%94%B9%E5%93%94%E5%93%A9%E5%93%94%E5%93%A9%E7%9A%84%E8%A7%86%E9%A2%91%E6%92%AD%E6%94%BE%E6%BA%90?locale_override=1
+
+
+## 项目地址
 https://github.com/Kanda-Akihito-Kun/ccb
 
 
