@@ -21,6 +21,8 @@ var (
 		{Abbr: "-hnzz-", Name: "郑州"},
 		{Abbr: "-hljheb-", Name: "哈市"},
 		{Abbr: "-nmghhht-", Name: "呼市"},
+		{Abbr: "-xj-", Name: "新疆"},
+		{Abbr: "-gotcha", Name: "外部"},
 	}
 
 	regionList = make([]string, 0, len(regionPatternMap))
