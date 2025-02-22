@@ -12,15 +12,15 @@ import (
 
 func fillRegionList() {
 	for _, v := range regionPatternMap {
-		regionList = append(regionList, v)
+		regionList = append(regionList, v.Name)
 	}
 }
 
 func matchSubDomainToRegion(response Response) {
 	for _, subDomain := range response.Data.Result {
-		for k, v := range regionPatternMap {
-			if strings.Contains(subDomain, k) {
-				cdnMap[v] = append(cdnMap[v], subDomain)
+		for _, v := range regionPatternMap {
+			if strings.Contains(subDomain, v.Abbr) {
+				cdnMap[v.Name] = append(cdnMap[v.Name], subDomain)
 			}
 		}
 	}
@@ -77,4 +77,6 @@ func updateSubDomainData() {
 
 		matchSubDomainToRegion(response)
 	}
+
+	fmt.Println(cdnMap)
 }
