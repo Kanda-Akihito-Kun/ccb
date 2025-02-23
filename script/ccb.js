@@ -38,7 +38,7 @@ const initCdnList = [
 ]
 var cdnList = [
     defaultCdnNode,
-    initCdnList
+    ...initCdnList
 ]
 
 // 判断 CCB 是否启用
