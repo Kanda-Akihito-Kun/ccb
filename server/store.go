@@ -24,7 +24,7 @@ var (
 		{Abbr: "-hljheb-", Name: "哈市"},
 		{Abbr: "-nmghhht-", Name: "呼市"},
 		{Abbr: "-xj-", Name: "新疆"},
-		{Abbr: "-gotcha", Name: "外部"},
+		{Abbr: "-gotcha", Name: "外建"},
 		{Abbr: "-hk-", Name: "香港"},
 		{Abbr: "-kaigai-", Name: "海外"},
 	}
