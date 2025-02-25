@@ -24,6 +24,12 @@ func matchSubDomainToRegion(response Response) {
 			}
 		}
 	}
+
+	fillKaigaiCdnList()
+}
+
+func fillKaigaiCdnList() {
+	cdnMap["海外"] = kaigaiCdnList
 }
 
 type Response struct {
@@ -38,6 +44,10 @@ type Response struct {
 	} `json:"data"`
 }
 
+/*
+更新 bilivideo.com 的子域名记录,
+但是由于接口的限流策略导致请求多了可能会炸, 所以别搞太猛
+*/
 func updateSubDomainData() {
 	cdnMap = make(map[string][]string)
 
@@ -78,5 +88,5 @@ func updateSubDomainData() {
 		matchSubDomainToRegion(response)
 	}
 
-	fmt.Println(cdnMap)
+	lastSuccessTime = time.Now()
 }

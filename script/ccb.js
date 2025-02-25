@@ -297,7 +297,7 @@ function fromHTML(html) {
                 await getCdnListByRegion(GM_getValue(regionStored, regionList[0]))
 
                 const regionSelector = fromHTML(`
-                    <div id="cdn-selector" class="bpx-player-ctrl-setting-checkbox" style="margin-left: 10px;">
+                    <div class="bpx-player-ctrl-setting-checkbox" style="margin-left: 10px; display: flex;">
                         <select class="bui-select" style="background: #2b2b2b; color: white; border: 1px solid #444; padding: 2px 5px; border-radius: 4px; width: 60px; height: 22px; font-size: 12px;">
                             ${regionList.map(region => `<option value="${region}"${region === GM_getValue(regionStored, regionList[0]) ? ' selected' : ''}>${region}</option>`).join('')}
                         </select>
@@ -315,7 +315,7 @@ function fromHTML(html) {
 
                 // 添加 CDN 选择下拉列表
                 const cdnSelector = fromHTML(`
-                    <div class="bpx-player-ctrl-setting-checkbox" style="margin-left: 10px;">
+                    <div class="bpx-player-ctrl-setting-checkbox" style="margin-left: 10px; display: flex;">
                         <select class="bui-select" style="background: #2b2b2b; color: white; border: 1px solid #444; padding: 2px 5px; border-radius: 4px; width: 150px; height: 22px; font-size: 12px;">
                             ${cdnList.map(cdn => `<option value="${cdn}"${cdn === GM_getValue(cdnNodeStored, cdnList[0]) ? ' selected' : ''}>${cdn}</option>`).join('')}
                         </select>
