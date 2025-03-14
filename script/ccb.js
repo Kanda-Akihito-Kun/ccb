@@ -8,6 +8,7 @@
 // @run-at       document-start
 // @match        https://www.bilibili.com/video/*
 // @match        https://www.bilibili.com/bangumi/play/*
+// @match        https://www.bilibili.com/festival/*
 // @connect      cherrynmsl.sbs
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
@@ -287,7 +288,7 @@ function fromHTML(html) {
     }
 
     // 添加组件
-    if (location.href.startsWith('https://www.bilibili.com/video/') || location.href.startsWith('https://www.bilibili.com/bangumi/play/')) {
+    if (location.href.startsWith('https://www.bilibili.com/video/') || location.href.startsWith('https://www.bilibili.com/bangumi/play/') || location.href.startsWith('https://www.bilibili.com/festival/')) {
         waitForElm('#bilibili-player > div > div > div.bpx-player-primary-area > div.bpx-player-video-area > div.bpx-player-control-wrap > div.bpx-player-control-entity > div.bpx-player-control-bottom > div.bpx-player-control-bottom-left')
             .then(async settingsBar => {
 
