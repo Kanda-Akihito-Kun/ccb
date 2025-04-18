@@ -89,4 +89,5 @@ func updateSubDomainData() {
 	}
 
 	lastSuccessTime = time.Now()
+	requestCount = 0
 }
