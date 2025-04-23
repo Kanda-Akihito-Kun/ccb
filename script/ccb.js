@@ -85,11 +85,6 @@ const getCdnListByRegion = async (region) => {
             return;
         }
 
-        // 有缓存直接更新
-        if (cdnList[region] && cdnList[region].length > 0) {
-            return cdnList[region]
-        }
-
         const response = await fetch(`${api}/cdn.json`);
         const data = await response.json();
         // 从完整的 CDN 数据中获取指定地区的数据
