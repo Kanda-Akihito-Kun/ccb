@@ -2,21 +2,21 @@
 // @name         Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的视频播放源
 // @namespace    CCB
 // @license      MIT
-// @version      0.0.1
-// @description  修改哔哩哔哩的视频播放源
+// @version      0.1.0
+// @description  修改哔哩哔哩的视频播放源 - 部署于 GitHub Action 版本
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
 // @match        https://www.bilibili.com/video/*
 // @match        https://www.bilibili.com/bangumi/play/*
 // @match        https://www.bilibili.com/festival/*
-// @connect      cherrynmsl.sbs
+// @connect      https://kanda-akihito-kun.github.io/ccb/api/
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        unsafeWindow
 // ==/UserScript==
 
-const api = 'http://cherrynmsl.sbs:8080'
+const api = 'https://kanda-akihito-kun.github.io/ccb/api'
 
 // 日志输出函数
 const PluginName = 'CCB'
@@ -65,30 +65,14 @@ const Replacement = (() => {
 
 // 地区列表
 var regionList = ['-']
+
 const getRegionList = async () => {
     try {
-        const response = await new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: `${api}/region`,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                onload: (response) => resolve(response),
-                onerror: (error) => reject(error)
-            });
-        });
-
-        const data = JSON.parse(response.responseText);
-
-        // 确保返回数据中包含该地区的数据
-        if (data.data && Array.isArray(data.data)) {
-            // 保留默认节点，并添加新的 CDN 列表
-            regionList = ["-", ...data.data];
-            log(`已更新地区列表: ${data.data}`);
-        } else {
-            log(`未找到地区数据`);
-        }
+        const response = await fetch(`${api}/region.json`);
+        const data = await response.json();
+        // 直接使用 JSON 数据
+        regionList = ["-", ...data];
+        log(`已更新地区列表: ${data}`);
     } catch (error) {
         log('获取地区列表失败:', error);
     }
@@ -98,38 +82,28 @@ const getCdnListByRegion = async (region) => {
     try {
         if (region === '-') {
             cdnList = [defaultCdnNode, ...initCdnList];
+            return;
         }
 
-        const response = await new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: `${api}/cdn?region=${region}`,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept-Charset': 'utf-8'
-                },
-                onload: (response) => resolve(response),
-                onerror: (error) => reject(error)
-            });
-        });
-
-        const data = JSON.parse(response.responseText);
-        // 确保返回数据中包含该地区的数据
-        if (data.data && Array.isArray(data.data)) {
-            // 保留默认节点，并添加新的 CDN 列表
-            cdnList = [defaultCdnNode, ...data.data];
-
-            // 更新 CDN 选择器的选项
-            const cdnSelect = document.querySelector('.bpx-player-ctrl-setting-checkbox select:last-child');
-            if (cdnSelect) {
-                cdnSelect.innerHTML = cdnList.map(cdn =>
-                    `<option value="${cdn}"${cdn === GM_getValue(cdnNodeStored, cdnList[0]) ? ' selected' : ''}>${cdn}</option>`
-                ).join('');
-            }
-            log(`已更新 ${region} 地区的 CDN 列表`);
-        } else {
-            log(`未找到 ${region} 地区的 CDN 数据`);
+        // 有缓存直接更新
+        if (cdnList[region] && cdnList[region].length > 0) {
+            return cdnList[region]
         }
+
+        const response = await fetch(`${api}/cdn.json`);
+        const data = await response.json();
+        // 从完整的 CDN 数据中获取指定地区的数据
+        const regionData = data[region] || [];
+        cdnList = [defaultCdnNode, ...regionData];
+
+        // 更新 CDN 选择器
+        const cdnSelect = document.querySelector('.bpx-player-ctrl-setting-checkbox select:last-child');
+        if (cdnSelect) {
+            cdnSelect.innerHTML = cdnList.map(cdn =>
+                `<option value="${cdn}"${cdn === GM_getValue(cdnNodeStored, cdnList[0]) ? ' selected' : ''}>${cdn}</option>`
+            ).join('');
+        }
+        log(`已更新 ${region} 地区的 CDN 列表`);
     } catch (error) {
         log('获取 CDN 列表失败:', error);
     }
