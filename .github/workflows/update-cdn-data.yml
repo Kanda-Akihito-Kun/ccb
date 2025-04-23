@@ -93,16 +93,12 @@ jobs:
               }
               cdnMap["海外"] = kaigaiCdnList
           }
-
+          
           func main() {
-              for i := range 20 {
+              for i := 0; i < 20; i++ {
                   url := fmt.Sprintf("https://chaziyu.com/ipchaxun.do?domain=bilivideo.com&page=%d", i)
                   client := &http.Client{Timeout: 10 * time.Second}
                   req, err := http.NewRequest("GET", url, nil)
-                  if err != nil {
-                      log.Printf("创建请求失败 [%d]: %v", i, err)
-                      continue
-                  }
 
                   req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
                   req.Header.Set("Accept", "application/json")
