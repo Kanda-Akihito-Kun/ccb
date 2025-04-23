@@ -20,6 +20,7 @@
   "呼市": [
     "cn-nmghhht-cu-01-09.bilivideo.com",
     "cn-nmghhht-cu-01-08.bilivideo.com",
+    "cn-nmghhht-cu-01-15.bilivideo.com",
     "cn-nmghhht-cu-01-12.bilivideo.com",
     "cn-nmghhht-cm-01-11.bilivideo.com",
     "cn-nmghhht-cu-01-01.bilivideo.com"
@@ -61,6 +62,15 @@
     "cn-tj-cm-02-06.bilivideo.com",
     "cn-tj-cu-01-11.bilivideo.com",
     "cn-tj-cu-01-02.bilivideo.com",
+    "cn-tj-cm-02-02.bilivideo.com",
+    "cn-tj-cu-01-13.bilivideo.com",
+    "cn-tj-cu-01-09.bilivideo.com",
+    "cn-tj-cu-01-06.bilivideo.com",
+    "cn-tj-cm-02-05.bilivideo.com",
+    "cn-tj-cm-02-01.bilivideo.com",
+    "cn-tj-cu-01-04.bilivideo.com",
+    "cn-tj-cu-01-10.bilivideo.com",
+    "cn-tj-cu-01-03.bilivideo.com",
     "cn-tj-cm-02-07.bilivideo.com",
     "cn-tj-cm-02-04.bilivideo.com",
     "cn-tj-cm-02-09.bilivideo.com"
@@ -94,6 +104,14 @@
     "cn-sccd-ct-01-18.bilivideo.com",
     "cn-sccd-ct-01-25.bilivideo.com",
     "cn-sccd-ct-01-23.bilivideo.com",
+    "cn-sccd-cm-03-05.bilivideo.com",
+    "cn-sccd-ct-01-24.bilivideo.com",
+    "cn-sccd-cu-01-09.bilivideo.com",
+    "cn-sccd-ct-01-17.bilivideo.com",
+    "cn-sccd-ct-01-26.bilivideo.com",
+    "cn-sccd-cu-01-05.bilivideo.com",
+    "cn-sccd-ct-01-20.bilivideo.com",
+    "cn-sccd-ct-01-19.bilivideo.com",
     "cn-sccd-cm-03-02.bilivideo.com",
     "cn-sccd-ct-01-22.bilivideo.com",
     "cn-sccd-ct-01-10.bilivideo.com",
@@ -113,6 +131,8 @@
   "杭州": [
     "cn-zjhz-cu-01-05.bilivideo.com",
     "cn-zjhz-cm-01-12.bilivideo.com",
+    "cn-zjhz-cm-01-07.bilivideo.com",
+    "cn-zjhz-cm-01-04.bilivideo.com",
     "cn-zjhz-cu-v-02.bilivideo.com",
     "cn-zjhz-cm-01-01.bilivideo.com",
     "cn-zjhz-cu-01-01.bilivideo.com",
@@ -122,6 +142,8 @@
   ],
   "武汉": [
     "cn-hbwh-cm-01-19.bilivideo.com",
+    "cn-hbwh-cm-01-09.bilivideo.com",
+    "cn-hbwh-cm-01-02.bilivideo.com",
     "cn-hbwh-cm-01-01.bilivideo.com",
     "cn-hbwh-cm-01-08.bilivideo.com",
     "cn-hbwh-cm-01-10.bilivideo.com",
@@ -135,6 +157,9 @@
     "cn-hbwh-cm-01-18.bilivideo.com"
   ],
   "泉州": [
+    "cn-fjqz-cm-01-03.bilivideo.com",
+    "cn-fjqz-cm-01-02.bilivideo.com",
+    "cn-fjqz-cm-01-04.bilivideo.com",
     "cn-fjqz-cm-01-08.bilivideo.com",
     "cn-fjqz-cm-01-06.bilivideo.com",
     "cn-fjqz-cm-01-05.bilivideo.com",
