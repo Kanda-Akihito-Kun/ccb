@@ -37,4 +37,4 @@ https://github.com/Kanda-Akihito-Kun/ccb
 
 ## 联系方式
 
-B站用户：鼠鼠今天吃嘉然 
+B站用户：鼠鼠今天吃嘉然
