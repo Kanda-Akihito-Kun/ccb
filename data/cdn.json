@@ -2,8 +2,7 @@
   "上海": [
     "cn-sh-office-bcache-01.bilivideo.com",
     "cn-sh-fx-01-04.bilivideo.com",
-    "cn-sh-cc-bcache-05.bilivideo.com",
-    "cn-sh-fx-01-09.bilivideo.com"
+    "cn-sh-cc-bcache-05.bilivideo.com"
   ],
   "北京": [
     "cn-bj-fx-01-05.bilivideo.com",
@@ -31,10 +30,10 @@
     "cn-hljheb-ct-01-03.bilivideo.com",
     "cn-hljheb-ct-01-02.bilivideo.com",
     "cn-hljheb-cm-01-03.bilivideo.com",
-    "cn-hljheb-cm-01-01.bilivideo.com",
-    "cn-hljheb-dx-v-05.bilivideo.com"
+    "cn-hljheb-cm-01-01.bilivideo.com"
   ],
   "外建": [
+    "d1--cn-gotcha207.bilivideo.com",
     "d1--p1--cn-gotcha04.bilivideo.com",
     "d1--ov-gotcha207.bilivideo.com",
     "d1--ov-gotcha208.bilivideo.com",
@@ -170,6 +169,7 @@
     "upos-sz-mirroraliov.bilivideo.com"
   ],
   "深圳": [
+    "upos-sz-estgcos.bilivideo.com",
     "upos-sz-mirrorcosdisp.bilivideo.com",
     "upos-sz-mirrorbd.bilivideo.com",
     "upos-sz-mirrorcf1ov.bilivideo.com",
