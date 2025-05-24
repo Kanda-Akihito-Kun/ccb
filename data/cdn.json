@@ -1,5 +1,6 @@
 {
   "上海": [
+    "cn-sh-ct-01-13.bilivideo.com",
     "cn-sh-office-bcache-01.bilivideo.com",
     "cn-sh-fx-01-04.bilivideo.com",
     "cn-sh-cc-bcache-05.bilivideo.com"
@@ -188,8 +189,7 @@
     "upos-sz-mirrorali02.bilivideo.com",
     "upos-sz-estgoss.bilivideo.com",
     "upos-sz-estgoss02.bilivideo.com",
-    "upos-sz-static.bilivideo.com",
-    "upos-sz-staticcos.bilivideo.com"
+    "upos-sz-static.bilivideo.com"
   ],
   "郑州": [
     "cn-hnzz-fx-01-01.bilivideo.com",
