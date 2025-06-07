@@ -14,6 +14,7 @@
     "cn-bj-fx-01-01.bilivideo.com"
   ],
   "南京": [
+    "cn-jsnj-fx-02-07.bilivideo.com",
     "cn-jsnj-fx-02-10.bilivideo.com",
     "cn-jsnj-fx-02-05.bilivideo.com"
   ],
@@ -52,9 +53,7 @@
     "d1--cn-gotcha204-3.bilivideo.com",
     "d1--cn-gotcha204-1.bilivideo.com",
     "d1--cn-gotcha204-4.bilivideo.com",
-    "d1--cn-gotcha204-2.bilivideo.com",
-    "d1--ov-gotcha206.bilivideo.com",
-    "d1--ov-gotcha106.bilivideo.com"
+    "d1--cn-gotcha204-2.bilivideo.com"
   ],
   "天津": [
     "cn-tj-cu-01-12.bilivideo.com",
@@ -188,8 +187,7 @@
     "upos-sz-mirror08ct.bilivideo.com",
     "upos-sz-mirrorali02.bilivideo.com",
     "upos-sz-estgoss.bilivideo.com",
-    "upos-sz-estgoss02.bilivideo.com",
-    "upos-sz-static.bilivideo.com"
+    "upos-sz-estgoss02.bilivideo.com"
   ],
   "郑州": [
     "cn-hnzz-fx-01-01.bilivideo.com",
