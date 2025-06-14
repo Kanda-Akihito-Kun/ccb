@@ -284,17 +284,18 @@ function fromHTML(html) {
     if (location.href.startsWith('https://www.bilibili.com/video/')
         || location.href.startsWith('https://www.bilibili.com/bangumi/play/')
         || location.href.startsWith('https://www.bilibili.com/festival/')) {
+        // 不知道为什么, 批站会在部分限免视频的播放器前面套娃一层
         waitForElm([
             '#bilibili-player > div > div > div.bpx-player-primary-area > div.bpx-player-video-area > div.bpx-player-control-wrap > div.bpx-player-control-entity > div.bpx-player-control-bottom > div.bpx-player-control-bottom-left',
             '#bilibili-player > div > div > div > div.bpx-player-primary-area > div.bpx-player-video-area > div.bpx-player-control-wrap > div.bpx-player-control-entity > div.bpx-player-control-bottom > div.bpx-player-control-bottom-left'
         ])
             .then(async settingsBar => {
-
                 // 先获取地区列表
                 await getRegionList();
                 // 根据之前保存的地区信息加载 CDN 列表
                 await getCdnListByRegion(GM_getValue(regionStored, regionList[0]))
 
+                // 地区
                 const regionSelector = fromHTML(`
                     <div class="bpx-player-ctrl-setting-checkbox" style="margin-left: 10px; display: flex;">
                         <select class="bui-select" style="background: #2b2b2b; color: white; border: 1px solid #444; padding: 2px 5px; border-radius: 4px; width: 60px; height: 22px; font-size: 12px;">
@@ -312,7 +313,7 @@ function fromHTML(html) {
                     await getCdnListByRegion(selectedRegion)
                 })
 
-                // 添加 CDN 选择下拉列表
+                // CDN 选择下拉列表
                 const cdnSelector = fromHTML(`
                     <div class="bpx-player-ctrl-setting-checkbox" style="margin-left: 10px; display: flex;">
                         <select class="bui-select" style="background: #2b2b2b; color: white; border: 1px solid #444; padding: 2px 5px; border-radius: 4px; width: 150px; height: 22px; font-size: 12px;">

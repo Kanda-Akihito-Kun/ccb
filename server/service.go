@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 )
@@ -26,8 +27,17 @@ func matchSubDomainToRegion(response Response) {
 	}
 
 	fillKaigaiCdnList()
+	sortCdnLists()
 }
 
+// 对所有地区的 CDN 列表进行排序
+func sortCdnLists() {
+	for region := range cdnMap {
+		sort.Strings(cdnMap[region])
+	}
+}
+
+// 海外节点手动添加, 因为命名规则不一样
 func fillKaigaiCdnList() {
 	cdnMap["海外"] = kaigaiCdnList
 }

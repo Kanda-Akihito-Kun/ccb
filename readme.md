@@ -18,17 +18,30 @@
 4. 通过定时服务更新部署在github page上的文档，如果刷新不出来地区和节点列表，那估计你是在白名单地区（胡建、荷兰、苏联等），请挂梯子；
 
 
+## 项目结构
+
+1. script - 前端脚本；
+
+2. server - 后端服务，可以直接部署在服务器上；
+
+3. data 和 .github - 定时执行 workflow，然后把 json 数据保存下来提供静态访问，该模块的主要目的是节约服务器成本；
+
+
+## 二开注意
+
+1. 如果直接部署在服务器上，并且想要实现定时更新功能，那么记得修改 cron.go 文件；
+
+2. 如果想增加地区，一共有 3 个地方的代码要同时改，分别是 store.go、region.json、update-cdn-data.yml
+
+3. 如果想增加适配的页面，那么在修改 ccb.js 的时候，记得同时修改 @match 和 location.href.startsWith
+
+
 ## 项目地址
 https://github.com/Kanda-Akihito-Kun/ccb
 
 
 ## 插件下载地址
 https://greasyfork.org/zh-CN/scripts/527498-custom-cdn-of-bilibili-ccb-%E4%BF%AE%E6%94%B9%E5%93%94%E5%93%A9%E5%93%94%E5%93%A9%E7%9A%84%E8%A7%86%E9%A2%91%E6%92%AD%E6%94%BE%E6%BA%90?locale_override=1
-
-
-## 叠甲
-
-仅供学习娱乐。
 
 
 ## 联系方式

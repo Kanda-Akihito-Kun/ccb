@@ -21,6 +21,8 @@ var (
 		{Abbr: "-hbwh-", Name: "武汉"},
 		{Abbr: "-fjqz-", Name: "泉州"},
 		{Abbr: "-hnzz-", Name: "郑州"},
+		{Abbr: "-sxxa-", Name: "西安"},
+		{Abbr: "-lnsy-", Name: "沈阳"},
 		{Abbr: "-hljheb-", Name: "哈市"},
 		{Abbr: "-nmghhht-", Name: "呼市"},
 		{Abbr: "-xj-", Name: "新疆"},
