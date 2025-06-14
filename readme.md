@@ -6,7 +6,8 @@
 
 通过解析 bilivideo.com 的子域名列表获取 CDN 域名列表，以及修改网页的 DOM 元素，实现切换批站的播放源。
 
-![image]([https://github.com/user-attachments/assets/5793d898-57bb-48a5-a36f-dc826b8a2785](https://greasyfork.org/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsiZGF0YSI6MTY4MjIxLCJwdXIiOiJibG9iX2lkIn19--88ee3af8149609db8dacfe42cc914f50bddbf0d2/demo.png?locale=zh-CN&locale_override=1))
+![image](https://github.com/user-attachments/assets/ae6534e3-1c78-484f-81e7-69d8608242f1)
+
 
 
 
