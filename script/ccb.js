@@ -42,7 +42,7 @@ var cdnList = [
     ...initCdnList
 ]
 
-// 判断 CCB 是否启用
+// 要是选择了 defaultCdnNode 就不要改节点
 const isCcbEnabled = () => {
     return getCurCdnNode() !== defaultCdnNode
 }
@@ -87,6 +87,7 @@ const getCdnListByRegion = async (region) => {
 
         const response = await fetch(`${api}/cdn.json`);
         const data = await response.json();
+
         // 从完整的 CDN 数据中获取指定地区的数据
         const regionData = data[region] || [];
         cdnList = [defaultCdnNode, ...regionData];
@@ -110,9 +111,15 @@ const playInfoTransformer = playInfo => {
             /https:\/\/.*?\//,
             Replacement
         )
-        i.baseUrl = newUrl; i.base_url = newUrl
+        i.baseUrl = newUrl;
+        i.base_url = newUrl
     };
-    const durlTransformer = i => { i.url = i.url.replace(/https:\/\/.*?\//, Replacement) };
+    const durlTransformer = i => {
+        i.url = i.url.replace(
+            /https:\/\/.*?\//,
+            Replacement
+        )
+    };
 
     if (playInfo.code !== (void 0) && playInfo.code !== 0) {
         log('Failed to get playInfo, message:', playInfo.message)
@@ -138,15 +145,21 @@ const playInfoTransformer = playInfo => {
         video_info = playInfo.data
     }
     try {
-        video_info.dash.video.forEach(urlTransformer)
-        video_info.dash.audio.forEach(urlTransformer)
-    } catch (err) {
-        if (video_info.durl) { // 充电专属视频
-            log('accept_description:', video_info.accept_description?.join(', '))
+        // 可能是充电专属视频的接口
+        if (video_info.dash) {
+            // 绝大部分视频的 video_info 接口返回的数据格式长这样
+            video_info.dash.video.forEach(urlTransformer)
+            video_info.dash.audio.forEach(urlTransformer)
+        } else if (video_info.durl) {
             video_info.durl.forEach(durlTransformer)
-        } else {
-            log('ERR:', err)
+        } else if (video_info.video_info) {
+            // 可能是限免视频的接口
+            video_info.video_info.dash.video.forEach(urlTransformer)
+            video_info.video_info.dash.audio.forEach(urlTransformer)
         }
+    } catch (err) {
+        // 我也不知道这是啥格式了
+        log('ERR:', err)
     }
 }
 
@@ -191,24 +204,33 @@ const interceptNetResponse = (theWindow => {
     return interceptNetResponse
 })(unsafeWindow)
 
-const waitForElm = (selector) => new Promise(resolve => {
-    let ele = document.querySelector(selector)
-    if (ele) return resolve(ele)
+const waitForElm = (selectors) => new Promise(resolve => {
+    const findElement = () => {
+        const selArray = Array.isArray(selectors) ? selectors : [selectors];
+        for (const s of selArray) {
+            const ele = document.querySelector(s);
+            if (ele) return ele;
+        }
+        return null;
+    };
+
+    let ele = findElement();
+    if (ele) return resolve(ele);
 
     const observer = new MutationObserver(mutations => {
-        let ele = document.querySelector(selector)
+        let ele = findElement();
         if (ele) {
-            observer.disconnect()
-            resolve(ele)
+            observer.disconnect();
+            resolve(ele);
         }
-    })
+    });
 
     observer.observe(document.documentElement, {
         childList: true,
         subtree: true
-    })
+    });
 
-    log('waitForElm, MutationObserver started.')
+    log('waitForElm, MutationObserver started for selectors:', selectors);
 })
 
 // Parse HTML string to DOM Element
@@ -229,10 +251,12 @@ function fromHTML(html) {
         if (url.startsWith('https://api.bilibili.com/x/player/wbi/playurl') ||
             url.startsWith('https://api.bilibili.com/pgc/player/web/v2/playurl') ||
             url.startsWith('https://api.bilibili.com/x/player/playurl') ||
+            url.startsWith('https://api.bilibili.com/x/player/online') ||
+            url.startsWith('https://api.bilibili.com/x/player/wbi') ||
             url.startsWith('https://api.bilibili.com/pgc/player/web/playurl') ||
             url.startsWith('https://api.bilibili.com/pugv/player/web/playurl') // at /cheese/
         ) {
-            if (response === null) return true // the url is handleable
+            if (response === null) return true
 
             log('(Intercepted) playurl api response.')
             const responseText = response
@@ -257,8 +281,13 @@ function fromHTML(html) {
     }
 
     // 添加组件
-    if (location.href.startsWith('https://www.bilibili.com/video/') || location.href.startsWith('https://www.bilibili.com/bangumi/play/') || location.href.startsWith('https://www.bilibili.com/festival/')) {
-        waitForElm('#bilibili-player > div > div > div.bpx-player-primary-area > div.bpx-player-video-area > div.bpx-player-control-wrap > div.bpx-player-control-entity > div.bpx-player-control-bottom > div.bpx-player-control-bottom-left')
+    if (location.href.startsWith('https://www.bilibili.com/video/')
+        || location.href.startsWith('https://www.bilibili.com/bangumi/play/')
+        || location.href.startsWith('https://www.bilibili.com/festival/')) {
+        waitForElm([
+            '#bilibili-player > div > div > div.bpx-player-primary-area > div.bpx-player-video-area > div.bpx-player-control-wrap > div.bpx-player-control-entity > div.bpx-player-control-bottom > div.bpx-player-control-bottom-left',
+            '#bilibili-player > div > div > div > div.bpx-player-primary-area > div.bpx-player-video-area > div.bpx-player-control-wrap > div.bpx-player-control-entity > div.bpx-player-control-bottom > div.bpx-player-control-bottom-left'
+        ])
             .then(async settingsBar => {
 
                 // 先获取地区列表
