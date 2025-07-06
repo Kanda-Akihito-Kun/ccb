@@ -4,7 +4,7 @@
 
 ## 项目介绍
 
-通过解析 bilivideo.com 的子域名列表获取 CDN 域名列表，以及修改网页的 DOM 元素，实现切换批站的播放源。
+通过解析 bilivideo.com 的子域名列表获取 CDN 域名列表，以及修改网页的 DOM 元素，实现切换批站的播放源。 
 
 ![image](https://github.com/user-attachments/assets/ae6534e3-1c78-484f-81e7-69d8608242f1)
 
