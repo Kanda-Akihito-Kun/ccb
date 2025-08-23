@@ -1,5 +1,6 @@
 {
   "上海": [
+    "cn-sh-ct-01-06.bilivideo.com",
     "cn-sh-ct-01-13.bilivideo.com",
     "cn-sh-ct-01-15.bilivideo.com",
     "cn-sh-ct-01-24.bilivideo.com",
@@ -148,6 +149,7 @@
     "cn-hbwh-cm-01-09.bilivideo.com",
     "cn-hbwh-cm-01-10.bilivideo.com",
     "cn-hbwh-cm-01-12.bilivideo.com",
+    "cn-hbwh-cm-01-13.bilivideo.com",
     "cn-hbwh-cm-01-17.bilivideo.com",
     "cn-hbwh-cm-01-18.bilivideo.com",
     "cn-hbwh-cm-01-19.bilivideo.com",
@@ -182,8 +184,6 @@
     "upos-sz-dynqn.bilivideo.com",
     "upos-sz-estgcos.bilivideo.com",
     "upos-sz-estghw.bilivideo.com",
-    "upos-sz-estgoss.bilivideo.com",
-    "upos-sz-estgoss02.bilivideo.com",
     "upos-sz-mirror08c.bilivideo.com",
     "upos-sz-mirror08ct.bilivideo.com",
     "upos-sz-mirror08h.bilivideo.com",
