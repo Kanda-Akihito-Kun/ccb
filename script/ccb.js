@@ -9,6 +9,7 @@
 // @match        https://www.bilibili.com/video/*
 // @match        https://www.bilibili.com/bangumi/play/*
 // @match        https://www.bilibili.com/festival/*
+// @match        https://www.bilibili.com/list/*
 // @connect      https://kanda-akihito-kun.github.io/ccb/api/
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
@@ -283,7 +284,9 @@ function fromHTML(html) {
     // 添加组件
     if (location.href.startsWith('https://www.bilibili.com/video/')
         || location.href.startsWith('https://www.bilibili.com/bangumi/play/')
-        || location.href.startsWith('https://www.bilibili.com/festival/')) {
+        || location.href.startsWith('https://www.bilibili.com/festival/')
+        || location.href.startsWith('https://www.bilibili.com/list/')
+    ) {
         // 不知道为什么, 批站会在部分限免视频的播放器前面套娃一层
         waitForElm([
             '#bilibili-player > div > div > div.bpx-player-primary-area > div.bpx-player-video-area > div.bpx-player-control-wrap > div.bpx-player-control-entity > div.bpx-player-control-bottom > div.bpx-player-control-bottom-left',
