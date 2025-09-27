@@ -3,6 +3,7 @@
     "cn-sh-ct-01-06.bilivideo.com",
     "cn-sh-ct-01-13.bilivideo.com",
     "cn-sh-ct-01-15.bilivideo.com",
+    "cn-sh-ct-01-23.bilivideo.com",
     "cn-sh-ct-01-24.bilivideo.com",
     "cn-sh-ct-01-36.bilivideo.com",
     "cn-sh-office-bcache-01.bilivideo.com"
@@ -231,7 +232,6 @@
     "cn-hk-eq-01-12.bilivideo.com",
     "cn-hk-eq-01-13.bilivideo.com",
     "cn-hk-eq-01-14.bilivideo.com",
-    "cn-hk-eq-bcache-13.bilivideo.com",
-    "cn-hk-eq-bcache-16.bilivideo.com"
+    "cn-hk-eq-bcache-13.bilivideo.com"
   ]
 }
