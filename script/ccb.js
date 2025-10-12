@@ -14,6 +14,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_registerMenuCommand
 // @grant        unsafeWindow
 // ==/UserScript==
 
@@ -26,10 +27,16 @@ const log = console.log.bind(console, `[${PluginName}]:`)
 const defaultCdnNode = '使用默认源'
 var cdnNodeStored = 'CCB'
 var regionStored = 'region'
+var powerModeStored = 'powerMode'
 
 // 获取当前节点名称
 const getCurCdnNode = () => {
     return GM_getValue(cdnNodeStored, cdnList[0])
+}
+
+// 获取强力模式状态
+const getPowerMode = () => {
+    return GM_getValue(powerModeStored, false)
 }
 
 // CDN 列表
@@ -107,24 +114,26 @@ const getCdnListByRegion = async (region) => {
 }
 
 const playInfoTransformer = playInfo => {
-    // 处理 baseUrl 和 backupUrl
     const urlTransformer = i => {
-        const newBaseUrl = i.base_url.replace(
+        const newUrl = i.base_url.replace(
             /https:\/\/.*?\//,
             Replacement
         )
-        i.baseUrl = newBaseUrl
-        i.base_url = newBaseUrl
-
-        if (i.backupUrl && Array.isArray(i.backupUrl)) {
-            i.backupUrl = i.backupUrl.map(url => 
-                url.replace(/https:\/\/.*?\//, Replacement)
-            );
-        }
-        if (i.backup_url && Array.isArray(i.backup_url)) {
-            i.backup_url = i.backup_url.map(url => 
-                url.replace(/https:\/\/.*?\//, Replacement)
-            );
+        i.baseUrl = newUrl;
+        i.base_url = newUrl
+        
+        // 只有在强力模式开启时才处理 backupUrl
+        if (getPowerMode()) {
+            if (i.backupUrl && Array.isArray(i.backupUrl)) {
+                i.backupUrl = i.backupUrl.map(url => 
+                    url.replace(/https:\/\/.*?\//, Replacement)
+                );
+            }
+            if (i.backup_url && Array.isArray(i.backup_url)) {
+                i.backup_url = i.backup_url.map(url => 
+                    url.replace(/https:\/\/.*?\//, Replacement)
+                );
+            }
         }
     };
 
@@ -258,6 +267,36 @@ function fromHTML(html) {
 
 (function () {
     'use strict';
+
+    // 注册油猴脚本菜单命令
+    const updateMenuCommand = () => {
+        const currentMode = getPowerMode()
+        const statusIcon = currentMode ? '⚡' : '❎'
+        const statusText = currentMode ? '开启' : '关闭'
+        const menuText = `${statusIcon} 强力模式 (当前${statusText}，点击此处进行切换)`
+        
+        GM_registerMenuCommand(menuText, () => {
+            const newMode = !getPowerMode()
+            GM_setValue(powerModeStored, newMode)
+            
+            const newStatusText = newMode ? '开启' : '关闭'
+            const newStatusIcon = newMode ? '⚡' : '❎'
+            
+            // 添加日志输出
+            log(`强力模式已${newStatusText} ${newStatusIcon}`)
+            
+            const description = newMode 
+                ? '强力模式已开启。\n当前会强行指定节点，即使遇到视频加载失败也不自动切换。\n如遇视频加载失败或严重卡顿，请关闭该模式。' 
+                : '强力模式已关闭。\n当前只会修改主要CDN节点，保持备用节点不变。\n如需强制指定节点，请确保节点有效后再进行开启。'
+            
+            alert(`ℹ ${newStatusText}强力模式\n\n${description}\n\n页面将自动刷新以使设置生效...`)
+            
+            location.reload()
+        })
+    }
+    
+    // 初始化菜单命令
+    updateMenuCommand()
 
     // Hook Bilibili PlayUrl Api
     interceptNetResponse((response, url) => {
