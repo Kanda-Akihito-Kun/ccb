@@ -329,7 +329,7 @@ function fromHTML(html) {
                 })
                 
                 // 创建自定义CDN输入框
-                const currentCdn = GM_getValue(cdnNodeStored, cdnList[0])
+                const currentCdn = GM_getValue(cdnNodeStored, '')
                 const customCdnInput = fromHTML(`
                     <div class="bpx-player-ctrl-setting-checkbox" style="margin-left: 10px; display: none;">
                         <input type="text" placeholder="${currentCdn}" style="background: #2b2b2b; color: white; border: 1px solid #444; padding: 2px 5px; border-radius: 4px; width: 150px; height: 22px; font-size: 12px; box-sizing: border-box;">
@@ -342,8 +342,7 @@ function fromHTML(html) {
                   const toggleCdnDisplay = (region) => {
                       if (region === '编辑') {
                          // 更新输入框的placeholder为当前选择的CDN
-                         const currentSelectedCdn = GM_getValue(cdnNodeStored, cdnList[0])
-                         customInput.placeholder = currentSelectedCdn
+                         customInput.placeholder = GM_getValue(cdnNodeStored, '')
                          cdnSelector.style.display = 'none'
                          customCdnInput.style.display = 'flex'
                      } else {
