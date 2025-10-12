@@ -65,14 +65,14 @@ const Replacement = (() => {
 })()
 
 // 地区列表
-var regionList = ['-']
+var regionList = ['编辑']
 
 const getRegionList = async () => {
     try {
         const response = await fetch(`${api}/region.json`);
         const data = await response.json();
         // 直接使用 JSON 数据
-        regionList = ["-", ...data];
+        regionList = ["编辑", ...data];
         log(`已更新地区列表: ${data}`);
     } catch (error) {
         log('获取地区列表失败:', error);
@@ -81,7 +81,7 @@ const getRegionList = async () => {
 
 const getCdnListByRegion = async (region) => {
     try {
-        if (region === '-') {
+        if (region === '编辑') {
             cdnList = [defaultCdnNode, ...initCdnList];
             return;
         }
@@ -309,12 +309,6 @@ function fromHTML(html) {
 
                 // 监听地区选择框, 一旦改变就保存最新信息并获取该地区的 CDN 列表
                 const regionNode = regionSelector.querySelector('select')
-                regionNode.addEventListener('change', async (e) => {
-                    const selectedRegion = e.target.value
-                    GM_setValue(regionStored, selectedRegion)
-                    // 请求该地区的 CDN 列表
-                    await getCdnListByRegion(selectedRegion)
-                })
 
                 // CDN 选择下拉列表
                 const cdnSelector = fromHTML(`
@@ -333,9 +327,64 @@ function fromHTML(html) {
                     // 刷新网页
                     location.reload()
                 })
+                
+                // 创建自定义CDN输入框
+                const currentCdn = GM_getValue(cdnNodeStored, cdnList[0])
+                const customCdnInput = fromHTML(`
+                    <div class="bpx-player-ctrl-setting-checkbox" style="margin-left: 10px; display: none;">
+                        <input type="text" placeholder="${currentCdn}" style="background: #2b2b2b; color: white; border: 1px solid #444; padding: 2px 5px; border-radius: 4px; width: 150px; height: 22px; font-size: 12px; box-sizing: border-box;">
+                    </div>
+                `)
+                
+                const customInput = customCdnInput.querySelector('input')
+                
+                // 检查当前地区是否为编辑模式，决定显示CDN选择器还是输入框
+                  const toggleCdnDisplay = (region) => {
+                      if (region === '编辑') {
+                         // 更新输入框的placeholder为当前选择的CDN
+                         const currentSelectedCdn = GM_getValue(cdnNodeStored, cdnList[0])
+                         customInput.placeholder = currentSelectedCdn
+                         cdnSelector.style.display = 'none'
+                         customCdnInput.style.display = 'flex'
+                     } else {
+                         cdnSelector.style.display = 'flex'
+                         customCdnInput.style.display = 'none'
+                     }
+                 }
+                
+                // 监听自定义CDN输入框的回车事件
+                customInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const customCDN = e.target.value.trim()
+                        if (customCDN) {
+                            GM_setValue(cdnNodeStored, customCDN)
+                            // 刷新网页
+                            location.reload()
+                        }
+                    }
+                })
+                
+                // 更新地区选择器的事件处理
+                regionNode.addEventListener('change', async (e) => {
+                    const selectedRegion = e.target.value
+                    GM_setValue(regionStored, selectedRegion)
+                    
+                    // 切换显示模式
+                    toggleCdnDisplay(selectedRegion)
+                    
+                    if (selectedRegion !== '编辑') {
+                        // 请求该地区的 CDN 列表
+                        await getCdnListByRegion(selectedRegion)
+                    }
+                })
+                
+                // 初始化显示状态
+                 const currentRegion = GM_getValue(regionStored, regionList[0])
+                 toggleCdnDisplay(currentRegion)
 
                 settingsBar.appendChild(regionNode)
                 settingsBar.appendChild(cdnSelector)
+                settingsBar.appendChild(customCdnInput)
                 log('CDN selector added')
             });
     }
