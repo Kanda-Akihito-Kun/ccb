@@ -2,7 +2,7 @@
 // @name         Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的视频播放源
 // @namespace    CCB
 // @license      MIT
-// @version      0.1.0
+// @version      1.0.0
 // @description  修改哔哩哔哩的视频播放源 - 部署于 GitHub Action 版本
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
@@ -107,14 +107,27 @@ const getCdnListByRegion = async (region) => {
 }
 
 const playInfoTransformer = playInfo => {
+    // 处理 baseUrl 和 backupUrl
     const urlTransformer = i => {
-        const newUrl = i.base_url.replace(
+        const newBaseUrl = i.base_url.replace(
             /https:\/\/.*?\//,
             Replacement
         )
-        i.baseUrl = newUrl;
-        i.base_url = newUrl
+        i.baseUrl = newBaseUrl
+        i.base_url = newBaseUrl
+
+        if (i.backupUrl && Array.isArray(i.backupUrl)) {
+            i.backupUrl = i.backupUrl.map(url => 
+                url.replace(/https:\/\/.*?\//, Replacement)
+            );
+        }
+        if (i.backup_url && Array.isArray(i.backup_url)) {
+            i.backup_url = i.backup_url.map(url => 
+                url.replace(/https:\/\/.*?\//, Replacement)
+            );
+        }
     };
+
     const durlTransformer = i => {
         i.url = i.url.replace(
             /https:\/\/.*?\//,
