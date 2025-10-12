@@ -34,6 +34,7 @@ var (
 	kaigaiCdnList = []string{
 		"upos-hz-mirrorakam.akamaized.net",
 		"upos-sz-mirroraliov.bilivideo.com",
+		"upos-sz-mirrorcosov.bilivideo.com",
 	}
 
 	regionList = make([]string, 0, len(regionPatternMap))

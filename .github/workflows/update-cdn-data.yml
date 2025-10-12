@@ -81,6 +81,7 @@ jobs:
               kaigaiCdnList = []string{
                   "upos-hz-mirrorakam.akamaized.net",
                   "upos-sz-mirroraliov.bilivideo.com",
+                  "upos-sz-mirrorcosov.bilivideo.com",
               }
 
               cdnMap = make(map[string][]string)
