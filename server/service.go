@@ -81,13 +81,15 @@ func updateSubDomainData() {
 		}
 
 		matchSubDomainToRegion(response)
+	}
 
-		cdnMap["海外"] = kaigaiCdnList
-		cdnMap["福建"] = append(fuzhouCdnList, cdnMap["福建"]...)
+	// 手动添加
+	cdnMap["海外"] = kaigaiCdnList
+	cdnMap["福建"] = append(fuzhouCdnList, cdnMap["福建"]...)
 
-		for region := range cdnMap {
-			sort.Strings(cdnMap[region])
-		}
+	// 节点内部排序
+	for region := range cdnMap {
+		sort.Strings(cdnMap[region])
 	}
 
 	lastSuccessTime = time.Now()
