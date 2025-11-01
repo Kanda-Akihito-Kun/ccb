@@ -37,6 +37,15 @@ var (
 		"upos-sz-mirrorcosov.bilivideo.com",
 	}
 
+	fuzhouCdnList = []string{
+		"cn-fjfz-fx-01-01.bilivideo.com",
+		"cn-fjfz-fx-01-02.bilivideo.com",
+		"cn-fjfz-fx-01-03.bilivideo.com",
+		"cn-fjfz-fx-01-04.bilivideo.com",
+		"cn-fjfz-fx-01-05.bilivideo.com",
+		"cn-fjfz-fx-01-06.bilivideo.com",
+	}
+
 	regionList = make([]string, 0, len(regionPatternMap))
 
 	// region : [url]

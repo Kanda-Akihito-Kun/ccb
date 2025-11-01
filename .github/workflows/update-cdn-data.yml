@@ -83,6 +83,15 @@ jobs:
                   "upos-sz-mirroraliov.bilivideo.com",
                   "upos-sz-mirrorcosov.bilivideo.com",
               }
+          
+              fuzhouCdnList = []string{
+                  "cn-fjfz-fx-01-01.bilivideo.com",
+                  "cn-fjfz-fx-01-02.bilivideo.com",
+                  "cn-fjfz-fx-01-03.bilivideo.com",
+                  "cn-fjfz-fx-01-04.bilivideo.com",
+                  "cn-fjfz-fx-01-05.bilivideo.com",
+                  "cn-fjfz-fx-01-06.bilivideo.com",
+              }
 
               cdnMap = make(map[string][]string)
           )
@@ -96,6 +105,8 @@ jobs:
                   }
               }
               cdnMap["海外"] = kaigaiCdnList
+              cdnMap["福建"] = append(fuzhouCdnList, cdnMap["福建"]...)
+          
               for region := range cdnMap {
                   sort.Strings(cdnMap[region])
               }

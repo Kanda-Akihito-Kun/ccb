@@ -26,20 +26,12 @@ func matchSubDomainToRegion(response Response) {
 		}
 	}
 
-	fillKaigaiCdnList()
-	sortCdnLists()
-}
+	cdnMap["海外"] = kaigaiCdnList
+	cdnMap["福建"] = append(fuzhouCdnList, cdnMap["福建"]...)
 
-// 对所有地区的 CDN 列表进行排序
-func sortCdnLists() {
 	for region := range cdnMap {
 		sort.Strings(cdnMap[region])
 	}
-}
-
-// 海外节点手动添加, 因为命名规则不一样
-func fillKaigaiCdnList() {
-	cdnMap["海外"] = kaigaiCdnList
 }
 
 type Response struct {
