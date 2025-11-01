@@ -20,7 +20,8 @@
   "南京": [
     "cn-jsnj-fx-02-05.bilivideo.com",
     "cn-jsnj-fx-02-07.bilivideo.com",
-    "cn-jsnj-fx-02-10.bilivideo.com"
+    "cn-jsnj-fx-02-10.bilivideo.com",
+    "cn-jsnj-gd-01-02.bilivideo.com"
   ],
   "呼市": [
     "cn-nmghhht-cm-01-11.bilivideo.com",
@@ -169,16 +170,6 @@
     "cn-lnsy-cu-01-04.bilivideo.com",
     "cn-lnsy-cu-01-06.bilivideo.com"
   ],
-  "泉州": [
-    "cn-fjqz-cm-01-01.bilivideo.com",
-    "cn-fjqz-cm-01-02.bilivideo.com",
-    "cn-fjqz-cm-01-03.bilivideo.com",
-    "cn-fjqz-cm-01-04.bilivideo.com",
-    "cn-fjqz-cm-01-05.bilivideo.com",
-    "cn-fjqz-cm-01-06.bilivideo.com",
-    "cn-fjqz-cm-01-07.bilivideo.com",
-    "cn-fjqz-cm-01-08.bilivideo.com"
-  ],
   "海外": [
     "upos-hz-mirrorakam.akamaized.net",
     "upos-sz-mirroraliov.bilivideo.com",
@@ -201,6 +192,16 @@
     "upos-sz-originbstar.bilivideo.com",
     "upos-sz-origincosgzhw.bilivideo.com",
     "upos-sz-origincosv.bilivideo.com"
+  ],
+  "福建": [
+    "cn-fjqz-cm-01-01.bilivideo.com",
+    "cn-fjqz-cm-01-02.bilivideo.com",
+    "cn-fjqz-cm-01-03.bilivideo.com",
+    "cn-fjqz-cm-01-04.bilivideo.com",
+    "cn-fjqz-cm-01-05.bilivideo.com",
+    "cn-fjqz-cm-01-06.bilivideo.com",
+    "cn-fjqz-cm-01-07.bilivideo.com",
+    "cn-fjqz-cm-01-08.bilivideo.com"
   ],
   "西安": [
     "cn-sxxa-cm-01-01.bilivideo.com",
