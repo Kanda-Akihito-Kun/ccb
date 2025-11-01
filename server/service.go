@@ -25,13 +25,6 @@ func matchSubDomainToRegion(response Response) {
 			}
 		}
 	}
-
-	cdnMap["海外"] = kaigaiCdnList
-	cdnMap["福建"] = append(fuzhouCdnList, cdnMap["福建"]...)
-
-	for region := range cdnMap {
-		sort.Strings(cdnMap[region])
-	}
 }
 
 type Response struct {
@@ -88,6 +81,13 @@ func updateSubDomainData() {
 		}
 
 		matchSubDomainToRegion(response)
+
+		cdnMap["海外"] = kaigaiCdnList
+		cdnMap["福建"] = append(fuzhouCdnList, cdnMap["福建"]...)
+
+		for region := range cdnMap {
+			sort.Strings(cdnMap[region])
+		}
 	}
 
 	lastSuccessTime = time.Now()

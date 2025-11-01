@@ -104,12 +104,6 @@ jobs:
                       }
                   }
               }
-              cdnMap["海外"] = kaigaiCdnList
-              cdnMap["福建"] = append(fuzhouCdnList, cdnMap["福建"]...)
-          
-              for region := range cdnMap {
-                  sort.Strings(cdnMap[region])
-              }
           }
           
           func main() {
@@ -142,6 +136,13 @@ jobs:
                   }
 
                   matchSubDomainToRegion(response)
+          
+                  cdnMap["海外"] = kaigaiCdnList
+                  cdnMap["福建"] = append(fuzhouCdnList, cdnMap["福建"]...)
+  
+                  for region := range cdnMap {
+                      sort.Strings(cdnMap[region])
+                  }
               }
 
               // 生成region列表
