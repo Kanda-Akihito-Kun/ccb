@@ -395,7 +395,7 @@ function fromHTML(html) {
     // 注册油猴脚本菜单命令
     const updateMenuCommand = () => {
         const currentPower = getPowerMode()
-        const powerIcon = currentPower ? '⚡' : '❎'
+        const powerIcon = currentPower ? '⚡' : '🚫'
         const powerText = currentPower ? '开启' : '关闭'
         const powerMenuText = `${powerIcon} 强力模式 (当前${powerText}，点击此处进行切换)`
 
@@ -404,7 +404,7 @@ function fromHTML(html) {
             GM_setValue(powerModeStored, newMode)
 
             const newStatusText = newMode ? '开启' : '关闭'
-            const newStatusIcon = newMode ? '⚡' : '❎'
+            const newStatusIcon = newMode ? '⚡' : '🚫'
 
             log(`强力模式已${newStatusText} ${newStatusIcon}`)
 
@@ -417,7 +417,7 @@ function fromHTML(html) {
         })
 
         const currentLive = getLiveMode()
-        const liveIcon = currentLive ? '✅' : '❎'
+        const liveIcon = currentLive ? '📺' : '🚫'
         const liveText = currentLive ? '开启' : '关闭'
         const liveMenuText = `${liveIcon} 适用直播间 (当前${liveText}，点击此处进行切换)`
 
@@ -426,7 +426,7 @@ function fromHTML(html) {
             GM_setValue(liveModeStored, newMode)
 
             const newStatusText = newMode ? '开启' : '关闭'
-            const newStatusIcon = newMode ? '✅' : '❎'
+            const newStatusIcon = newMode ? '📺' : '🚫'
 
             log(`适用直播间已${newStatusText} ${newStatusIcon}`)
 
@@ -579,17 +579,16 @@ function fromHTML(html) {
             /\/room\/v1\/Room\/playUrl$/.test(p)
         ) {
             if (!isLiveRoomPage()) return
-            if (response === null) {
-                const now = Date.now()
-                if (!interceptNetResponse._lastLiveReq || now - interceptNetResponse._lastLiveReq.t > 4000 || interceptNetResponse._lastLiveReq.p !== p) {
-                    interceptNetResponse._lastLiveReq = { t: now, p }
-                    log('Live playurl request matched:', { url: u.href })
-                }
-                return true
-            }
+            // if (response === null) {
+            //     const now = Date.now()
+            //     if (!interceptNetResponse._lastLiveReq || now - interceptNetResponse._lastLiveReq.t > 4000 || interceptNetResponse._lastLiveReq.p !== p) {
+            //         interceptNetResponse._lastLiveReq = { t: now, p }
+            //         log('Live playurl request matched:', { url: u.href })
+            //     }
+            //     return true
+            // }
             log('(Intercepted) live playurl api response:', { url: u.href })
-            const responseText = response
-            const playInfo = JSON.parse(responseText)
+            const playInfo = JSON.parse(response)
             livePlayInfoTransformer(playInfo)
             return JSON.stringify(playInfo)
         }
