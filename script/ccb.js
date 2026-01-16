@@ -74,7 +74,7 @@ const Replacement = (() => {
 
     let domain = getCurCdnNode()
 
-    log(`播放源已修改为: ${domain}`)
+    log(`播放源已修改: ${domain}`)
 
     return toURL(domain)
 })()
@@ -319,8 +319,8 @@ const interceptNetResponse = (theWindow => {
     const interceptNetResponse = (handler) => interceptors.push(handler)
 
     // when response === null && url is String, it's checking if the url is handleable
-    const handleInterceptedResponse = (response, url) => interceptors.reduce((modified, handler) => {
-        const ret = handler(modified, url)
+    const handleInterceptedResponse = (response, url, meta) => interceptors.reduce((modified, handler) => {
+        const ret = handler(modified, url, meta)
         return ret ? ret : modified
     }, response)
     const OriginalXMLHttpRequest = theWindow.XMLHttpRequest
@@ -328,28 +328,36 @@ const interceptNetResponse = (theWindow => {
     class XMLHttpRequest extends OriginalXMLHttpRequest {
         get responseText() {
             if (this.readyState !== this.DONE) return super.responseText
-            return handleInterceptedResponse(super.responseText, this.responseURL)
+            return handleInterceptedResponse(super.responseText, this.responseURL, { type: 'xhr', xhr: this })
         }
         get response() {
             if (this.readyState !== this.DONE) return super.response
-            return handleInterceptedResponse(super.response, this.responseURL)
+            return handleInterceptedResponse(super.response, this.responseURL, { type: 'xhr', xhr: this })
         }
     }
 
     theWindow.XMLHttpRequest = XMLHttpRequest
 
     const OriginalFetch = fetch
-    theWindow.fetch = (input, init) => (!handleInterceptedResponse(null, input) ? OriginalFetch(input, init) :
-            OriginalFetch(input, init).then(response =>
-                new Promise((resolve) => response.text()
-                    .then(text => resolve(new Response(handleInterceptedResponse(text, input), {
+    theWindow.fetch = (input, init) => {
+        const s = typeof input === 'string' ? input : (input && input.url)
+        const method = (init && init.method) || (input && input.method) || 'GET'
+        const shouldIntercept = handleInterceptedResponse(null, input, { type: 'fetch', input, init })
+        if (!shouldIntercept) return OriginalFetch(input, init)
+        log('Fetch intercepted:', { url: s, method, href: location.href })
+        return OriginalFetch(input, init).then(response =>
+            new Promise((resolve) => response.text()
+                .then(text => {
+                    const out = handleInterceptedResponse(text, input, { type: 'fetch', input, init, response })
+                    resolve(new Response(out, {
                         status: response.status,
                         statusText: response.statusText,
                         headers: response.headers
-                    })))
-                )
+                    }))
+                })
             )
-    );
+        )
+    }
 
     return interceptNetResponse
 })(unsafeWindow)
@@ -444,6 +452,84 @@ function fromHTML(html) {
     
     // 初始化菜单命令
     updateMenuCommand()
+
+    const liveBootstrapSeen = new WeakSet()
+    const installLiveBootstrapHooks = () => {
+        if (!getLiveMode() || !isLiveRoomPage() || !isCcbEnabled()) return
+
+        const tryRewrite = (obj, source) => {
+            if (!obj || typeof obj !== 'object') return
+            if (liveBootstrapSeen.has(obj)) return
+            liveBootstrapSeen.add(obj)
+            log('Live bootstrap rewrite:', { source, href: location.href })
+            livePlayInfoTransformer(obj)
+        }
+
+        const propNames = [
+            '__NEPTUNE__',
+            '__NEPTUNE_IS_MY_WAIFU__',
+            '__INITIAL_STATE__',
+            '__LIVE_PLAYER_CONFIG__',
+            '__LIVE_ROOM__'
+        ]
+        for (const name of propNames) {
+            try {
+                const desc = Object.getOwnPropertyDescriptor(unsafeWindow, name)
+                if (desc && desc.configurable === false) {
+                    if (unsafeWindow[name] && typeof unsafeWindow[name] === 'object') {
+                        tryRewrite(unsafeWindow[name], `window.${name} (non-configurable initial)`)
+                    }
+                    continue
+                }
+
+                let internal = unsafeWindow[name]
+                if (internal && typeof internal === 'object') {
+                    tryRewrite(internal, `window.${name} (initial)`)
+                }
+                Object.defineProperty(unsafeWindow, name, {
+                    configurable: true,
+                    get: () => internal,
+                    set: (v) => {
+                        internal = v
+                        log('Live window prop set:', { name, type: typeof v })
+                        if (v && typeof v === 'object') tryRewrite(v, `window.${name} (set)`)
+                    }
+                })
+            } catch (e) {
+                log('Live window prop hook failed:', { name, err: String(e) })
+            }
+        }
+
+        if (!JSON.parse._ccbLiveWrapped) {
+            const Oparse = JSON.parse
+            const wrapped = function (text, reviver) {
+                const isStr = typeof text === 'string'
+                let looksLive = false
+                if (isStr) {
+                    const hasMediaHost = text.includes('bilivideo.com') || text.includes('acgvideo.com')
+                    const hasLiveKeys = text.includes('"url_info"') || text.includes('"base_url"') || text.includes('live-bvc')
+                    const hasRoomApiKey = text.includes('getRoomPlayInfo') || text.includes('playUrl')
+                    looksLive = hasMediaHost && (hasLiveKeys || hasRoomApiKey)
+                }
+
+                const obj = Oparse.call(this, text, reviver)
+                if (looksLive && obj && typeof obj === 'object') {
+                    log('Live JSON.parse candidate:', {
+                        len: isStr ? text.length : undefined,
+                        head: isStr ? text.slice(0, 160) : undefined,
+                        href: location.href
+                    })
+                    tryRewrite(obj, 'JSON.parse')
+                }
+                return obj
+            }
+            wrapped._ccbLiveWrapped = true
+            JSON.parse = wrapped
+            log('Live JSON.parse hook installed:', { href: location.href })
+        }
+    }
+
+    installLiveBootstrapHooks()
 
     // bangumi 页：给 Worker 的脚本 Blob 预置一段前置代码，重写 Worker 内的分段请求域名
     // 这是为了解决主文档首屏无法拦截、且播放器在 WebWorker 内拉取分段的情况
@@ -546,7 +632,7 @@ function fromHTML(html) {
     }
 
     // Hook Bilibili PlayUrl Api
-    interceptNetResponse((response, url) => {
+    interceptNetResponse((response, url, meta) => {
         if (!isCcbEnabled()) return
         const u = typeof url === 'string' ? url : (url && url.url) || String(url)
         if (u.startsWith('https://api.bilibili.com/x/player/wbi/playurl') ||
@@ -557,7 +643,10 @@ function fromHTML(html) {
             u.startsWith('https://api.bilibili.com/pgc/player/web/playurl') ||
             u.startsWith('https://api.bilibili.com/pugv/player/web/playurl') // at /cheese/
         ) {
-            if (response === null) return true
+            if (response === null) {
+                log('Video playurl request matched:', { url: u, type: meta && meta.type })
+                return true
+            }
 
             log('(Intercepted) playurl api response.')
             const responseText = response
@@ -567,7 +656,7 @@ function fromHTML(html) {
         }
     });
 
-    interceptNetResponse((response, url) => {
+    interceptNetResponse((response, url, meta) => {
         if (!isCcbEnabled()) return
         if (!getLiveMode()) return
         const raw = typeof url === 'string' ? url : (url && url.url) || ''
@@ -578,18 +667,17 @@ function fromHTML(html) {
             return
         }
         const p = u.pathname || ''
-        if (/\/xlive\/web-room\/v\d+\/index\/getRoomPlayInfo$/.test(p) ||
-            /\/room\/v1\/Room\/playUrl$/.test(p)
+        if (/\/xlive\/web-room\/v\d+\/index\/getRoomPlayInfo\/?$/.test(p) ||
+            /\/room\/v1\/Room\/playUrl\/?$/.test(p)
         ) {
-            if (!isLiveRoomPage()) return
-            // if (response === null) {
-            //     const now = Date.now()
-            //     if (!interceptNetResponse._lastLiveReq || now - interceptNetResponse._lastLiveReq.t > 4000 || interceptNetResponse._lastLiveReq.p !== p) {
-            //         interceptNetResponse._lastLiveReq = { t: now, p }
-            //         log('Live playurl request matched:', { url: u.href })
-            //     }
-            //     return true
-            // }
+            if (response === null) {
+                log('Live playurl request matched:', { url: u.href, pathname: p, type: meta && meta.type, href: location.href })
+                return true
+            }
+            if (!isLiveRoomPage()) {
+                log('Live playurl matched but not room page:', { url: u.href, pathname: p, href: location.href, type: meta && meta.type })
+                return
+            }
             log('(Intercepted) live playurl api response:', { url: u.href })
             const playInfo = JSON.parse(response)
             livePlayInfoTransformer(playInfo)
