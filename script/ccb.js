@@ -42,22 +42,25 @@ const getPowerMode = () => {
     return GM_getValue(powerModeStored, false)
 }
 
+// 获取直播模式状态
 const getLiveMode = () => {
     return GM_getValue(liveModeStored, false)
 }
 
-// CDN 列表
+// 初始默认 CDN 列表
 const initCdnList = [
     'upos-sz-mirroraliov.bilivideo.com',
     'upos-sz-mirroralib.bilivideo.com',
     'upos-sz-estgcos.bilivideo.com',
 ]
+
+// CDN 列表
 var cdnList = [
     defaultCdnNode,
     ...initCdnList
 ]
 
-// 要是选择了 defaultCdnNode 就不要改节点
+// 要是选择了 defaultCdnNode 就不要生效改节点
 const isCcbEnabled = () => {
     return getCurCdnNode() !== defaultCdnNode
 }
