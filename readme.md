@@ -1,4 +1,4 @@
-# Custom CDN of Bilibili (CCB) - 修改B站视频的CDN
+# Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的网页视频、直播、番剧的播放源
 
 
 

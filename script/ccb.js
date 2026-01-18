@@ -2,7 +2,7 @@
 // @name         Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的网页视频、直播、番剧的播放源
 // @namespace    CCB
 // @license      MIT
-// @version      1.1.2
+// @version      1.1.8
 // @description  修改哔哩哔哩的视频播放源 - 部署于 GitHub Action 版本
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
@@ -223,53 +223,6 @@ const buildWorkerPrelude = () => {
         `    }\n` +
         `  } catch (_) {}\n` +
         `})();\n`
-}
-
-const installWorkerWrappers = (w) => {
-    try {
-        if (!w || w.__CCB_WORKER_WRAPPERS__) return
-        w.__CCB_WORKER_WRAPPERS__ = true
-
-        if (w.Blob) {
-            const OriginalBlob = w.Blob
-            w.Blob = function (parts, options) {
-                try {
-                    const type = options && options.type ? String(options.type) : ''
-                    const looksJs = /javascript/i.test(type)
-                        || (Array.isArray(parts) && parts.some(p => typeof p === 'string' && /importScripts|WorkerGlobalScope|bili/i.test(p)))
-                    if (looksJs && isCcbEnabled()) {
-                        const prelude = buildWorkerPrelude()
-                        const injected = [prelude, ...(Array.isArray(parts) ? parts : [parts])]
-                        return new OriginalBlob(injected, options)
-                    }
-                } catch (_) {}
-                return new OriginalBlob(parts, options)
-            }
-        }
-
-        if (w.Worker) {
-            const OriginalWorker = w.Worker
-            w.Worker = function (scriptURL, options) {
-                try {
-                    if (!isCcbEnabled()) return new OriginalWorker(scriptURL, options)
-                    const rawUrl = (typeof scriptURL === 'string') ? scriptURL : String(scriptURL)
-                    if (rawUrl.startsWith('blob:') || rawUrl.startsWith('data:')) {
-                        return new OriginalWorker(scriptURL, options)
-                    }
-                    const isModule = options && options.type === 'module'
-                    const prelude = buildWorkerPrelude()
-                    const wrapperCode = isModule
-                        ? `${prelude}\nimport ${JSON.stringify(rawUrl)};\n`
-                        : `${prelude}\nimportScripts(${JSON.stringify(rawUrl)});\n`
-                    const BlobCtor = w.Blob || Blob
-                    const url = (w.URL || URL).createObjectURL(new BlobCtor([wrapperCode], { type: 'application/javascript' }))
-                    return new OriginalWorker(url, options)
-                } catch (_) {
-                    return new OriginalWorker(scriptURL, options)
-                }
-            }
-        }
-    } catch (_) {}
 }
 
 const replaceMediaUrl = (s) => {
@@ -682,7 +635,7 @@ try {
                 if (!f || typeof f.getAttribute !== 'function') continue
                 const src = f.getAttribute('src') || ''
                 if (!src) continue
-                if (!/^https?:\/\/i\.hdslb\.com\/bfs\/seed\/jinkela\/short\/colis\/iframe\.html/i.test(src)) continue
+                if (!/^(?:https?:)?\/\/(?:[\w-]+\.)*hdslb\.com\/bfs\/seed\/jinkela\/short\/colis\/iframe\.html/i.test(src)) continue
                 try {
                     const u = new URL(src, location.href)
                     if (u.searchParams.get('__ccbcb') === '1') {
@@ -726,19 +679,45 @@ try {
 
     try {
         if (window.top === window && location.host === 'www.bilibili.com') {
-            bustCrossOriginPlayerIframe()
-            const mo = new MutationObserver(() => {
-                bustCrossOriginPlayerIframe()
-            })
-            mo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] })
-            setTimeout(() => { try { mo.disconnect() } catch (_) {} }, 60000)
-
             const fireNav = () => {
                 try {
                     bustCrossOriginPlayerIframe()
                     reInit()
                 } catch (_) {}
             }
+
+            const startObserver = () => {
+                try {
+                    if (window.__CCB_IFRAME_MO__) return true
+                    const root = document && document.documentElement
+                    if (!root) return false
+                    const mo = new MutationObserver(() => {
+                        bustCrossOriginPlayerIframe()
+                    })
+                    mo.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] })
+                    window.__CCB_IFRAME_MO__ = mo
+                    setTimeout(() => { try { mo.disconnect() } catch (_) {} }, 60000)
+                    return true
+                } catch (_) {
+                    return false
+                }
+            }
+
+            const ensureInit = () => {
+                try { startObserver() } catch (_) {}
+                try { fireNav() } catch (_) {}
+            }
+
+            ensureInit()
+            setTimeout(ensureInit, 0)
+            setTimeout(ensureInit, 1200)
+            try {
+                if (!window.__CCB_READY_BOUND__) {
+                    window.__CCB_READY_BOUND__ = true
+                    document.addEventListener('DOMContentLoaded', ensureInit, true)
+                    window.addEventListener('load', ensureInit, true)
+                }
+            } catch (_) {}
             const wrapHistory = (name) => {
                 const original = history && history[name]
                 if (!original || original.__ccbWrapped) return
@@ -929,8 +908,6 @@ function fromHTML(html) {
     }
 
     installLiveBootstrapHooks()
-
-    const isBangumiPlayPage = location.host === 'www.bilibili.com' && location.pathname.startsWith('/bangumi/play/')
 
     // Hook Bilibili PlayUrl Api
     interceptNetResponse((response, url, meta) => {
