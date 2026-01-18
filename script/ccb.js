@@ -57,12 +57,12 @@ const getCurCdnNode = () => {
 
 // 获取强力模式状态
 const getPowerMode = () => {
-    return GM_getValue(powerModeStored, false)
+    return GM_getValue(powerModeStored, true)
 }
 
 // 获取直播模式状态
 const getLiveMode = () => {
-    return GM_getValue(liveModeStored, false)
+    return GM_getValue(liveModeStored, true)
 }
 
 // 初始默认 CDN 列表
