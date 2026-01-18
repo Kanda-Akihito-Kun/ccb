@@ -51,6 +51,8 @@
 
 4. 重启浏览器，进入番剧页面，第一次进入可能不生效，此时 **来回切换一下集数或者使用 CTRL+F5 强制刷新** 即可完全生效；
 
+5. 可以的话，改完记得看看系统本地的下行网络连接，看看是不是真的改了，因为有可能只改了网页 DOM 展示，实际上真正的播放源没改成功；
+   
 
 ## 使用注意
 
@@ -101,4 +103,5 @@ https://greasyfork.org/zh-CN/scripts/527498-custom-cdn-of-bilibili-ccb-%E4%BF%AE
 ## 联系方式
 
 GitHub 提 issue / B站用户-鼠鼠今天吃嘉然（https://space.bilibili.com/3220012） / ~~线下真实~~
+
 
