@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的视频播放源
+// @name         Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的网页视频、直播、番剧的播放源
 // @namespace    CCB
 // @license      MIT
-// @version      1.0.0
+// @version      1.1.0
 // @description  修改哔哩哔哩的视频播放源 - 部署于 GitHub Action 版本
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
@@ -20,11 +20,26 @@
 // @grant        unsafeWindow
 // ==/UserScript==
 
+// ==========================
+// 基础配置 / 日志 / 存储键
+// ==========================
 const api = 'https://kanda-akihito-kun.github.io/ccb/api'
 
 // 日志输出函数
 const PluginName = 'CCB'
-const log = console.log.bind(console, `[${PluginName}]:`)
+const Logger = (() => {
+    const prefix = `【${PluginName}】`
+    const fmt = (level, args) => [`${prefix}【${level}】`, ...args]
+    return {
+        info: (...args) => console.log(...fmt('信息', args)),
+        warn: (...args) => console.warn(...fmt('警告', args)),
+        error: (...args) => console.error(...fmt('错误', args)),
+    }
+})()
+
+const log = Logger.info
+const warn = Logger.warn
+const error = Logger.error
 
 const defaultCdnNode = '使用默认源'
 var cdnNodeStored = 'CCB'
@@ -65,6 +80,9 @@ const isCcbEnabled = () => {
     return getCurCdnNode() !== defaultCdnNode
 }
 
+// ==========================
+// URL 替换（生成目标 Replacement）
+// ==========================
 // 替换播放源
 const Replacement = (() => {
     const toURL = ((url) => {
@@ -74,13 +92,51 @@ const Replacement = (() => {
 
     let domain = getCurCdnNode()
 
-    log(`播放源已修改: ${domain}`)
+    log('播放源:', domain)
 
     return toURL(domain)
 })()
 
 const ReplacementNoSlash = Replacement && Replacement.endsWith('/') ? Replacement.slice(0, -1) : Replacement
 
+const getReplacementHost = () => {
+    try {
+        return new URL(Replacement).host
+    } catch (_) {
+        return ''
+    }
+}
+
+const MEDIA_HOST_LIKE_RE = /\.(?:bilivideo|acgvideo)\.com(?:\/|$)/
+const MEDIA_URL_ORIGIN_HTTP_RE = /^https?:\/\/.*?\//
+const MEDIA_URL_ORIGIN_PROTO_REL_RE = /^\/\/.*?\//
+const MEDIA_HOST_PREFIX_RE = /^[\w.-]+\.(?:bilivideo|acgvideo)\.com\//
+const MEDIA_HOST_EXACT_RE = /^[\w.-]+\.(?:bilivideo|acgvideo)\.com$/
+const MEDIA_URL_IN_HTML_RE = /https?:\/\/[^"'\s]*?\.(?:bilivideo|acgvideo)\.com\//g
+const MEDIA_HOST_IN_HTML_RE = /\b[\w.-]+\.(?:bilivideo|acgvideo)\.com\b/g
+
+const replaceMediaUrl = (s) => {
+    if (typeof s !== 'string') return s
+    if (!MEDIA_HOST_LIKE_RE.test(s)) return s
+    if (s.startsWith('https://') || s.startsWith('http://')) return s.replace(MEDIA_URL_ORIGIN_HTTP_RE, Replacement)
+    if (s.startsWith('//')) return s.replace(MEDIA_URL_ORIGIN_PROTO_REL_RE, Replacement.replace(/^https?:/, ''))
+    if (MEDIA_HOST_PREFIX_RE.test(s)) return s.replace(/^[^/]+\//, `${getReplacementHost()}/`)
+    return s
+}
+
+const replaceMediaHostValue = (s) => {
+    if (typeof s !== 'string') return s
+    if (!MEDIA_HOST_LIKE_RE.test(s)) return s
+    const host = getReplacementHost()
+    if (s.startsWith('https://') || s.startsWith('http://')) return ReplacementNoSlash
+    if (s.startsWith('//')) return ReplacementNoSlash.replace(/^https?:/, '')
+    if (MEDIA_HOST_EXACT_RE.test(s)) return host
+    return s
+}
+
+// ==========================
+// 远端数据（地区 / CDN 列表）
+// ==========================
 // 地区列表
 var regionList = ['编辑']
 
@@ -90,9 +146,8 @@ const getRegionList = async () => {
         const data = await response.json();
         // 直接使用 JSON 数据
         regionList = ["编辑", ...data];
-        log(`已更新地区列表: ${data}`);
     } catch (error) {
-        log('获取地区列表失败:', error);
+        warn('获取地区列表失败:', error)
     }
 }
 
@@ -117,18 +172,17 @@ const getCdnListByRegion = async (region) => {
                 `<option value="${cdn}"${cdn === GM_getValue(cdnNodeStored, cdnList[0]) ? ' selected' : ''}>${cdn}</option>`
             ).join('');
         }
-        log(`已更新 ${region} 地区的 CDN 列表`);
     } catch (error) {
-        log('获取 CDN 列表失败:', error);
+        warn('获取 CDN 列表失败:', error)
     }
 }
 
+// ==========================
+// 播放信息改写（视频 / 番剧）
+// ==========================
 const playInfoTransformer = playInfo => {
     const urlTransformer = i => {
-        const newUrl = i.base_url.replace(
-            /https:\/\/.*?\//,
-            Replacement
-        )
+        const newUrl = replaceMediaUrl(i.base_url)
         i.baseUrl = newUrl;
         i.base_url = newUrl
         
@@ -136,26 +190,23 @@ const playInfoTransformer = playInfo => {
         if (getPowerMode()) {
             if (i.backupUrl && Array.isArray(i.backupUrl)) {
                 i.backupUrl = i.backupUrl.map(url => 
-                    url.replace(/https:\/\/.*?\//, Replacement)
+                    replaceMediaUrl(url)
                 );
             }
             if (i.backup_url && Array.isArray(i.backup_url)) {
                 i.backup_url = i.backup_url.map(url => 
-                    url.replace(/https:\/\/.*?\//, Replacement)
+                    replaceMediaUrl(url)
                 );
             }
         }
     };
 
     const durlTransformer = i => {
-        i.url = i.url.replace(
-            /https:\/\/.*?\//,
-            Replacement
-        )
+        i.url = replaceMediaUrl(i.url)
     };
 
     if (playInfo.code !== (void 0) && playInfo.code !== 0) {
-        log('Failed to get playInfo, message:', playInfo.message)
+        warn('获取播放信息失败:', playInfo.message)
         return
     }
 
@@ -166,7 +217,7 @@ const playInfoTransformer = playInfo => {
             if (playInfo.result.durl && playInfo.result.durls) {
                 video_info = playInfo.result // documentary trail viewing, m.bilibili.com/bangumi/play/* trail or non-trail viewing
             } else {
-                log('Failed to get video_info, limit_play_reason:', playInfo.result.play_check?.limit_play_reason)
+                warn('播放信息受限:', playInfo.result.play_check?.limit_play_reason)
             }
 
             // durl & durls are for trial viewing, and they usually exist when limit_play_reason=PAY
@@ -192,52 +243,23 @@ const playInfoTransformer = playInfo => {
         }
     } catch (err) {
         // 我也不知道这是啥格式了
-        log('ERR:', err)
+        error('改写播放信息异常:', err)
     }
 }
 
+// ==========================
+// 播放信息改写（直播）
+// ==========================
 const livePlayInfoTransformer = (playInfo) => {
     if (!playInfo || typeof playInfo !== 'object') return
     if (playInfo.code !== (void 0) && playInfo.code !== 0) {
-        log('Failed to get live playInfo, message:', playInfo.message)
+        warn('获取直播播放信息失败:', playInfo.message)
         return
     }
 
-    let targetHost = ''
-    let targetHostNoProto = ''
-    try {
-        const u = new URL(Replacement)
-        targetHost = u.host
-        targetHostNoProto = `//${u.host}`
-    } catch (e) {
-        log('Live playInfo rewrite skipped (bad Replacement):', { Replacement, err: String(e) })
+    if (!getReplacementHost()) {
+        warn('直播播放信息改写跳过：播放源格式异常', { Replacement })
         return
-    }
-
-    const canRewriteMediaUrl = (s) => typeof s === 'string' && (
-        /\.bilivideo\.com(?:\/|$)/.test(s) || /\.acgvideo\.com(?:\/|$)/.test(s)
-    )
-
-    const replaceMediaUrl = (s) => {
-        if (!canRewriteMediaUrl(s)) return s
-        if (s.startsWith('https://') || s.startsWith('http://')) {
-            return s.replace(/https?:\/\/.*?\//, Replacement)
-        }
-        if (s.startsWith('//')) {
-            return s.replace(/^\/\/.*?\//, Replacement.replace(/^https?:/, ''))
-        }
-        if (/^[\w.-]+\.(?:bilivideo|acgvideo)\.com\//.test(s)) {
-            return s.replace(/^[^/]+\//, `${targetHost}/`)
-        }
-        return s
-    }
-
-    const replaceMediaHost = (s) => {
-        if (!canRewriteMediaUrl(s)) return s
-        if (s.startsWith('https://') || s.startsWith('http://')) return ReplacementNoSlash
-        if (s.startsWith('//')) return ReplacementNoSlash.replace(/^https?:/, '')
-        if (/^[\w.-]+\.(?:bilivideo|acgvideo)\.com$/.test(s)) return targetHost
-        return s
     }
 
     let replaced = 0
@@ -253,7 +275,7 @@ const livePlayInfoTransformer = (playInfo) => {
 
         for (const [k, v] of Object.entries(node)) {
             if (typeof v === 'string') {
-                const out = (k === 'host') ? replaceMediaHost(v) : replaceMediaUrl(v)
+                const out = (k === 'host') ? replaceMediaHostValue(v) : replaceMediaUrl(v)
                 if (out !== v) {
                     replaced++
                     if (sampleBefore === undefined) {
@@ -269,50 +291,43 @@ const livePlayInfoTransformer = (playInfo) => {
     }
 
     walk(playInfo.data || playInfo.result || playInfo)
-    log('Live playInfo rewritten:', { replaced, sampleBefore, sampleAfter, targetHost, href: location.href })
 }
 
+// ==========================
+// 页面类型判断（直播间）
+// ==========================
 const isLiveRoomPage = () => {
     try {
         if (location.host !== 'live.bilibili.com') return false
         const p = location.pathname || '/'
         const ok = /^\/\d+\/?$/.test(p) || /^\/blanc\/\d+\/?$/.test(p)
-        if (getLiveMode() && location.href.startsWith('https://live.bilibili.com/')) {
-            const now = Date.now()
-            if (!isLiveRoomPage._last || isLiveRoomPage._last.ok !== ok || isLiveRoomPage._last.p !== p || now - isLiveRoomPage._last.t > 5000) {
-                isLiveRoomPage._last = { ok, p, t: now }
-                log('Live room check:', { ok, pathname: p, href: location.href })
-            }
-        }
         return ok
     } catch (e) {
-        if (getLiveMode()) {
-            log('Live room check failed:', { href: (() => { try { return location.href } catch (_) { return '' } })(), err: String(e) })
-        }
         return false
     }
 }
 
-// 将番剧页 HTML 中的 bilivideo 节点域名替换为当前选择的 CDN
-const replaceBilivideoInHtml = (html) => {
-    if (!isCcbEnabled()) return html
+// ==========================
+// HTML 字符串兜底替换（番剧页 / M3U8）
+// ==========================
+// 将番剧页 HTML 或 M3U8 文本中的 bilivideo 节点域名替换为当前选择的 CDN
+const replaceBilivideoInText = (text) => {
+    if (!isCcbEnabled()) return text
     try {
-        if (typeof html !== 'string') return html
-        // 只替换 bilivideo 域名前缀，不动其余参数与路径（带协议的 URL）
-        let out = html.replace(/https:\/\/[^"'\s]*?\.bilivideo\.com\//g, Replacement)
-        // 同时替换纯文本域名（如统计信息中的 Video Host）为目标 CDN 主机名
-        try {
-            const host = new URL(Replacement).host
-            out = out.replace(/\b[\w.-]+\.bilivideo\.com\b/g, host)
-        } catch (_) {}
-        log('在html拦截后的地址: ', out)
+        if (typeof text !== 'string') return text
+        let out = text.replace(MEDIA_URL_IN_HTML_RE, Replacement)
+        const host = getReplacementHost()
+        if (host) out = out.replace(MEDIA_HOST_IN_HTML_RE, host)
         return out
     } catch (e) {
-        log('替换番剧 HTML 失败:', e)
-        return html
+        warn('替换文本(HTML/M3U8)失败:', e)
+        return text
     }
 }
 
+// ==========================
+// 网络拦截层（XHR / fetch）
+// ==========================
 // Network Request Interceptor
 const interceptNetResponse = (theWindow => {
     const interceptors = []
@@ -325,6 +340,7 @@ const interceptNetResponse = (theWindow => {
     }, response)
     const OriginalXMLHttpRequest = theWindow.XMLHttpRequest
 
+    // handleInterceptedResponse 中会用到, IDE 的静态分析识别不出来而已, 别删
     class XMLHttpRequest extends OriginalXMLHttpRequest {
         get responseText() {
             if (this.readyState !== this.DONE) return super.responseText
@@ -344,7 +360,6 @@ const interceptNetResponse = (theWindow => {
         const method = (init && init.method) || (input && input.method) || 'GET'
         const shouldIntercept = handleInterceptedResponse(null, input, { type: 'fetch', input, init })
         if (!shouldIntercept) return OriginalFetch(input, init)
-        log('Fetch intercepted:', { url: s, method, href: location.href })
         return OriginalFetch(input, init).then(response =>
             new Promise((resolve) => response.text()
                 .then(text => {
@@ -362,6 +377,9 @@ const interceptNetResponse = (theWindow => {
     return interceptNetResponse
 })(unsafeWindow)
 
+// ==========================
+// DOM 工具（等待元素 / HTML 转节点）
+// ==========================
 const waitForElm = (selectors) => new Promise(resolve => {
     const findElement = () => {
         const selArray = Array.isArray(selectors) ? selectors : [selectors];
@@ -387,8 +405,6 @@ const waitForElm = (selectors) => new Promise(resolve => {
         childList: true,
         subtree: true
     });
-
-    log('waitForElm, MutationObserver started for selectors:', selectors);
 })
 
 // Parse HTML string to DOM Element
@@ -400,6 +416,9 @@ function fromHTML(html) {
     return result.length === 1 ? result[0] : result
 }
 
+// ==========================
+// 初始化入口（菜单 / Hook / UI）
+// ==========================
 (function () {
     'use strict';
 
@@ -461,17 +480,10 @@ function fromHTML(html) {
             if (!obj || typeof obj !== 'object') return
             if (liveBootstrapSeen.has(obj)) return
             liveBootstrapSeen.add(obj)
-            log('Live bootstrap rewrite:', { source, href: location.href })
             livePlayInfoTransformer(obj)
         }
 
-        const propNames = [
-            '__NEPTUNE__',
-            '__NEPTUNE_IS_MY_WAIFU__',
-            '__INITIAL_STATE__',
-            '__LIVE_PLAYER_CONFIG__',
-            '__LIVE_ROOM__'
-        ]
+        const propNames = ['__NEPTUNE_IS_MY_WAIFU__']
         for (const name of propNames) {
             try {
                 const desc = Object.getOwnPropertyDescriptor(unsafeWindow, name)
@@ -491,12 +503,11 @@ function fromHTML(html) {
                     get: () => internal,
                     set: (v) => {
                         internal = v
-                        log('Live window prop set:', { name, type: typeof v })
                         if (v && typeof v === 'object') tryRewrite(v, `window.${name} (set)`)
                     }
                 })
             } catch (e) {
-                log('Live window prop hook failed:', { name, err: String(e) })
+                warn('直播首播 Hook 安装失败:', { name, err: String(e) })
             }
         }
 
@@ -514,18 +525,12 @@ function fromHTML(html) {
 
                 const obj = Oparse.call(this, text, reviver)
                 if (looksLive && obj && typeof obj === 'object') {
-                    log('Live JSON.parse candidate:', {
-                        len: isStr ? text.length : undefined,
-                        head: isStr ? text.slice(0, 160) : undefined,
-                        href: location.href
-                    })
                     tryRewrite(obj, 'JSON.parse')
                 }
                 return obj
             }
             wrapped._ccbLiveWrapped = true
             JSON.parse = wrapped
-            log('Live JSON.parse hook installed:', { href: location.href })
         }
     }
 
@@ -544,14 +549,21 @@ function fromHTML(html) {
                     if (looksJs && isCcbEnabled()) {
                         const prelude = `(() => {\n` +
                             `  const Replacement = ${JSON.stringify(Replacement)};\n` +
+                            `  const MEDIA_HOST_LIKE_RE = ${MEDIA_HOST_LIKE_RE};\n` +
+                            `  const MEDIA_URL_ORIGIN_HTTP_RE = ${MEDIA_URL_ORIGIN_HTTP_RE};\n` +
+                            `  const MEDIA_URL_ORIGIN_PROTO_REL_RE = ${MEDIA_URL_ORIGIN_PROTO_REL_RE};\n` +
+                            `  const MEDIA_HOST_PREFIX_RE = ${MEDIA_HOST_PREFIX_RE};\n` +
+                            `  const MEDIA_HOST_EXACT_RE = ${MEDIA_HOST_EXACT_RE};\n` +
+                            `  const getReplacementHost = ${getReplacementHost.toString()};\n` +
+                            `  const replaceMediaUrl = ${replaceMediaUrl.toString()};\n` +
                             `  try {\n` +
                             `    const Ofetch = self.fetch;\n` +
                             `    self.fetch = (input, init) => {\n` +
                             `      try {\n` +
                             `        const s = typeof input === 'string' ? input : (input && input.url);\n` +
-                            `        if (typeof s === 'string' && /(?:https?:)?\\/\\/[^/]+\\.(?:bilivideo|acgvideo)\\.com\\//.test(s)) {\n` +
-                            `          const r = s.replace(/(?:https?:)?\\/\\/.*?\\//, Replacement);\n` +
-                            `          input = typeof input === 'string' ? r : new Request(r, input);\n` +
+                            `        if (typeof s === 'string') {\n` +
+                            `          const r = replaceMediaUrl(s);\n` +
+                            `          if (r !== s) input = typeof input === 'string' ? r : new Request(r, input);\n` +
                             `        }\n` +
                             `      } catch (_) {}\n` +
                             `      return Ofetch(input, init);\n` +
@@ -561,9 +573,7 @@ function fromHTML(html) {
                             `      class X extends OX {\n` +
                             `        open(m, u, a, usr, pwd) {\n` +
                             `          try {\n` +
-                            `            if (typeof u === 'string' && /(?:https?:)?\\/\\/[^/]+\\.(?:bilivideo|acgvideo)\\.com\\//.test(u)) {\n` +
-                            `              u = u.replace(/(?:https?:)?\\/\\/.*?\\//, Replacement);\n` +
-                            `            }\n` +
+                            `            if (typeof u === 'string') u = replaceMediaUrl(u);\n` +
                             `          } catch (_) {}\n` +
                             `          return super.open(m, u, a, usr, pwd);\n` +
                             `        }\n` +
@@ -574,14 +584,13 @@ function fromHTML(html) {
                             `})();\n`;
                         const injected = [prelude, ...(Array.isArray(parts) ? parts : [parts])]
                         const blob = new OriginalBlob(injected, options)
-                        log('Worker Blob prelude injected')
                         return blob
                     }
-                } catch (e) { log('Blob prelude inject failed:', e) }
+                } catch (e) { warn('注入 Worker 预置脚本失败:', e) }
                 return new OriginalBlob(parts, options)
             }
         } catch (err) {
-            log('Install Worker Blob hook failed:', err)
+            warn('安装 Worker Blob Hook 失败:', err)
         }
     }
 
@@ -595,20 +604,26 @@ function fromHTML(html) {
                     const isModule = options && options.type === 'module'
                     const prelude = `(() => {\n` +
                         `  const Replacement = ${JSON.stringify(Replacement)};\n` +
+                        `  const MEDIA_HOST_LIKE_RE = ${MEDIA_HOST_LIKE_RE};\n` +
+                        `  const MEDIA_URL_ORIGIN_HTTP_RE = ${MEDIA_URL_ORIGIN_HTTP_RE};\n` +
+                        `  const MEDIA_URL_ORIGIN_PROTO_REL_RE = ${MEDIA_URL_ORIGIN_PROTO_REL_RE};\n` +
+                        `  const MEDIA_HOST_PREFIX_RE = ${MEDIA_HOST_PREFIX_RE};\n` +
+                        `  const MEDIA_HOST_EXACT_RE = ${MEDIA_HOST_EXACT_RE};\n` +
+                        `  const getReplacementHost = ${getReplacementHost.toString()};\n` +
+                        `  const replaceMediaUrl = ${replaceMediaUrl.toString()};\n` +
                         `  try {\n` +
                         `    const Ofetch = self.fetch;\n` +
                         `    self.fetch = (input, init) => {\n` +
                         `      try { const s = typeof input === 'string' ? input : (input && input.url);\n` +
-                        `        if (typeof s === 'string' && /(?:https?:)?\\/\\/[^/]+\\.(?:bilivideo|acgvideo)\\.com\\//.test(s)) {\n` +
-                        `          const r = s.replace(/(?:https?:)?\\/\\/.*?\\//, Replacement);\n` +
-                        `          input = typeof input === 'string' ? r : new Request(r, input); }\n` +
+                        `        if (typeof s === 'string') { const r = replaceMediaUrl(s);\n` +
+                        `          if (r !== s) input = typeof input === 'string' ? r : new Request(r, input); }\n` +
                         `      } catch (_) {}\n` +
                         `      return Ofetch(input, init);\n` +
                         `    };\n` +
                         `    if (self.XMLHttpRequest) {\n` +
                         `      const OX = self.XMLHttpRequest;\n` +
                         `      class X extends OX { open(m,u,a,usr,pwd){\n` +
-                        `        try { if (typeof u === 'string' && /(?:https?:)?\\/\\/[^/]+\\.(?:bilivideo|acgvideo)\\.com\\//.test(u)) u = u.replace(/(?:https?:)?\\/\\/.*?\\//, Replacement); } catch(_){}\n` +
+                        `        try { if (typeof u === 'string') u = replaceMediaUrl(u); } catch(_){}\n` +
                         `        return super.open(m,u,a,usr,pwd); } }\n` +
                         `      self.XMLHttpRequest = X;\n` +
                         `    }\n` +
@@ -619,15 +634,14 @@ function fromHTML(html) {
                         : `${prelude}\nimportScripts(${JSON.stringify(String(scriptURL))});\n`
                     const blob = new Blob([wrapperCode], { type: 'application/javascript' })
                     const url = URL.createObjectURL(blob)
-                    log('Worker URL wrapped:', { original: String(scriptURL), type: isModule ? 'module' : 'classic' })
                     return new OriginalWorker(url, options)
                 } catch (e) {
-                    log('Worker wrap failed, fallback:', e)
+                    warn('包装 Worker 脚本失败，已回退到原始方式:', e)
                     return new OriginalWorker(scriptURL, options)
                 }
             }
         } catch (e) {
-            log('Install Worker(URL) wrapper failed:', e)
+            warn('安装 Worker(URL) Wrapper 失败:', e)
         }
     }
 
@@ -643,12 +657,7 @@ function fromHTML(html) {
             u.startsWith('https://api.bilibili.com/pgc/player/web/playurl') ||
             u.startsWith('https://api.bilibili.com/pugv/player/web/playurl') // at /cheese/
         ) {
-            if (response === null) {
-                log('Video playurl request matched:', { url: u, type: meta && meta.type })
-                return true
-            }
-
-            log('(Intercepted) playurl api response.')
+            if (response === null) return true
             const responseText = response
             const playInfo = JSON.parse(responseText)
             playInfoTransformer(playInfo)
@@ -670,18 +679,24 @@ function fromHTML(html) {
         if (/\/xlive\/web-room\/v\d+\/index\/getRoomPlayInfo\/?$/.test(p) ||
             /\/room\/v1\/Room\/playUrl\/?$/.test(p)
         ) {
-            if (response === null) {
-                log('Live playurl request matched:', { url: u.href, pathname: p, type: meta && meta.type, href: location.href })
-                return true
-            }
+            if (response === null) return true
             if (!isLiveRoomPage()) {
-                log('Live playurl matched but not room page:', { url: u.href, pathname: p, href: location.href, type: meta && meta.type })
                 return
             }
-            log('(Intercepted) live playurl api response:', { url: u.href })
             const playInfo = JSON.parse(response)
             livePlayInfoTransformer(playInfo)
             return JSON.stringify(playInfo)
+        }
+    })
+
+    // 拦截直播 M3U8 Master Playlist (画质切换)
+    interceptNetResponse((response, url, meta) => {
+        if (!isCcbEnabled()) return
+        if (!getLiveMode()) return
+        const u = typeof url === 'string' ? url : (url && url.url) || String(url)
+        if (u.includes('/xlive/play-gateway/master/url')) {
+            if (response === null) return true
+            return replaceBilivideoInText(response)
         }
     })
 
@@ -691,7 +706,7 @@ function fromHTML(html) {
             const origWrite = Document.prototype.write
             Document.prototype.write = function (...args) {
                 try {
-                    args = args.map(s => typeof s === 'string' ? replaceBilivideoInHtml(s) : s)
+                    args = args.map(s => typeof s === 'string' ? replaceBilivideoInText(s) : s)
                 } catch (_) {}
                 return origWrite.apply(this, args)
             }
@@ -699,7 +714,7 @@ function fromHTML(html) {
             const origInsertAdjacentHTML = Element.prototype.insertAdjacentHTML
             Element.prototype.insertAdjacentHTML = function (position, html) {
                 try {
-                    if (typeof html === 'string') html = replaceBilivideoInHtml(html)
+                    if (typeof html === 'string') html = replaceBilivideoInText(html)
                 } catch (_) {}
                 return origInsertAdjacentHTML.call(this, position, html)
             }
@@ -710,14 +725,13 @@ function fromHTML(html) {
                     configurable: true,
                     get() { return innerDesc.get.call(this) },
                     set(v) {
-                        try { if (typeof v === 'string') v = replaceBilivideoInHtml(v) } catch (_) {}
+                        try { if (typeof v === 'string') v = replaceBilivideoInText(v) } catch (_) {}
                         return innerDesc.set.call(this, v)
                     }
                 })
             }
-            log('已安装 HTML 字符串替换钩子（bangumi）')
         } catch (e) {
-            log('安装 HTML 替换钩子失败:', e)
+            warn('安装 HTML 字符串替换 Hook 失败:', e)
         }
     }
 
@@ -838,7 +852,6 @@ function fromHTML(html) {
                 settingsBar.appendChild(regionNode)
                 settingsBar.appendChild(cdnSelector)
                 settingsBar.appendChild(customCdnInput)
-                log('CDN selector added')
             });
     }
 
