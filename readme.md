@@ -1,4 +1,4 @@
-# Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的网页端视频和直播的播放源
+# Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的网页视频、直播、番剧的播放源
 
 
 
@@ -65,7 +65,7 @@
 4. 如果想增加适配的页面，那么在修改 ccb.js 的时候，记得同时修改 @match 和 location.href.startsWith（指普通视频）；
 
 
-## 更新日志（v1.1.8, 2025-01-19-Monday）
+## 更新日志（v1.1.8, 2026-01-19-Monday）
 
 1. 适配直播间、测速、付费番剧页面；
 
@@ -103,5 +103,6 @@ https://greasyfork.org/zh-CN/scripts/527498-custom-cdn-of-bilibili-ccb-%E4%BF%AE
 ## 联系方式
 
 GitHub 提 issue / B站用户-鼠鼠今天吃嘉然（https://space.bilibili.com/3220012） / ~~线下真实~~
+
 
 
