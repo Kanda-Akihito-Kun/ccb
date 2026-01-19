@@ -2,7 +2,7 @@
 // @name         Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的网页视频、直播、番剧的播放源
 // @namespace    CCB
 // @license      MIT
-// @version      1.1.8
+// @version      1.1.9
 // @description  修改哔哩哔哩的视频播放源 - 部署于 GitHub Action 版本
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
@@ -83,6 +83,27 @@ const isCcbEnabled = () => {
     return getCurCdnNode() !== defaultCdnNode
 }
 
+function isLiveRoomPage() {
+    try {
+        if (location.host !== 'live.bilibili.com') return false
+        const p = location.pathname || '/'
+        const ok = /^\/\d+\/?$/.test(p) || /^\/blanc\/\d+\/?$/.test(p)
+        return ok
+    } catch (e) {
+        return false
+    }
+}
+
+function shouldApplyReplacement() {
+    if (typeof __CCB_FORCE_REPLACE__ !== 'undefined') return !!__CCB_FORCE_REPLACE__
+    if (!isCcbEnabled()) return false
+    if (location.host === 'live.bilibili.com') {
+        if (!isLiveRoomPage()) return false
+        if (!getLiveMode()) return false
+    }
+    return true
+}
+
 // ==========================
 // URL 替换（生成目标 Replacement）
 // ==========================
@@ -127,6 +148,7 @@ const buildWorkerPrelude = () => {
     return `(() => {\n` +
         `  if (self.__CCB_WORKER_PRELUDE__) return;\n` +
         `  self.__CCB_WORKER_PRELUDE__ = true;\n` +
+        `  const __CCB_FORCE_REPLACE__ = ${JSON.stringify(shouldApplyReplacement())};\n` +
         `  const Replacement = ${JSON.stringify(Replacement)};\n` +
         `  const ReplacementNoSlash = (typeof Replacement === 'string' && Replacement.endsWith('/')) ? Replacement.slice(0, -1) : Replacement;\n` +
         `  const MEDIA_HOST_LIKE_RE = ${MEDIA_HOST_LIKE_RE};\n` +
@@ -135,6 +157,7 @@ const buildWorkerPrelude = () => {
         `  const MEDIA_URL_ORIGIN_PROTO_REL_RE = ${MEDIA_URL_ORIGIN_PROTO_REL_RE};\n` +
         `  const MEDIA_HOST_PREFIX_RE = ${MEDIA_HOST_PREFIX_RE};\n` +
         `  const MEDIA_HOST_EXACT_RE = ${MEDIA_HOST_EXACT_RE};\n` +
+        `  const shouldApplyReplacement = ${shouldApplyReplacement.toString()};\n` +
         `  const getReplacementHost = ${getReplacementHost.toString()};\n` +
         `  const replaceMediaUrl = ${replaceMediaUrl.toString()};\n` +
         `  const replaceMediaHostValue = ${replaceMediaHostValue.toString()};\n` +
@@ -227,6 +250,7 @@ const buildWorkerPrelude = () => {
 
 const replaceMediaUrl = (s) => {
     if (typeof s !== 'string') return s
+    if (!shouldApplyReplacement()) return s
     if (!MEDIA_HOST_LIKE_RE.test(s)) return s
 
     // 检查是否是需要忽略的子域
@@ -248,6 +272,7 @@ const replaceMediaUrl = (s) => {
 
 const replaceMediaHostValue = (s) => {
     if (typeof s !== 'string') return s
+    if (!shouldApplyReplacement()) return s
     if (!MEDIA_HOST_LIKE_RE.test(s)) return s
     const host = getReplacementHost()
     if (s.startsWith('https://') || s.startsWith('http://')) return ReplacementNoSlash
@@ -411,25 +436,11 @@ const livePlayInfoTransformer = (playInfo) => {
 }
 
 // ==========================
-// 页面类型判断（直播间）
-// ==========================
-const isLiveRoomPage = () => {
-    try {
-        if (location.host !== 'live.bilibili.com') return false
-        const p = location.pathname || '/'
-        const ok = /^\/\d+\/?$/.test(p) || /^\/blanc\/\d+\/?$/.test(p)
-        return ok
-    } catch (e) {
-        return false
-    }
-}
-
-// ==========================
 // HTML 字符串兜底替换（番剧页 / M3U8）
 // ==========================
 // 将番剧页 HTML 或 M3U8 文本中的 bilivideo 节点域名替换为当前选择的 CDN
 const replaceBilivideoInText = (text) => {
-    if (!isCcbEnabled()) return text
+    if (!shouldApplyReplacement()) return text
     try {
         if (typeof text !== 'string') return text
         let out = text.replace(MEDIA_URL_IN_HTML_RE, Replacement)
@@ -467,7 +478,7 @@ const interceptNetResponse = (theWindow => {
             class XMLHttpRequest extends OriginalXMLHttpRequest {
                 open(method, url, async, user, password) {
                     try {
-                        if (isCcbEnabled() && typeof url === 'string') {
+                        if (shouldApplyReplacement() && typeof url === 'string') {
                             url = replaceMediaUrl(url)
                         }
                     } catch (_) {}
@@ -487,7 +498,7 @@ const interceptNetResponse = (theWindow => {
             const OriginalFetch = w.fetch
             w.fetch = (input, init) => {
                 try {
-                    if (isCcbEnabled()) {
+                    if (shouldApplyReplacement()) {
                         const s0 = typeof input === 'string' ? input : (input && input.url)
                         if (typeof s0 === 'string') {
                             const r = replaceMediaUrl(s0)
@@ -532,7 +543,7 @@ const interceptNetResponse = (theWindow => {
                             const type = options && options.type ? String(options.type) : ''
                             const looksJs = /javascript/i.test(type)
                                 || (Array.isArray(parts) && parts.some(p => typeof p === 'string' && /importScripts|WorkerGlobalScope|bili/i.test(p)))
-                            if (looksJs && isCcbEnabled()) {
+                            if (looksJs && shouldApplyReplacement()) {
                                 const prelude = buildWorkerPrelude()
                                 const injected = [prelude, ...(Array.isArray(parts) ? parts : [parts])]
                                 return new OriginalBlob(injected, options)
@@ -550,7 +561,7 @@ const interceptNetResponse = (theWindow => {
                     const OriginalWorker = w.Worker
                     w.Worker = function (scriptURL, options) {
                         try {
-                            if (!isCcbEnabled()) return new OriginalWorker(scriptURL, options)
+                            if (!shouldApplyReplacement()) return new OriginalWorker(scriptURL, options)
                             const rawUrl = (typeof scriptURL === 'string') ? scriptURL : String(scriptURL)
                             if (rawUrl.startsWith('blob:') || rawUrl.startsWith('data:')) {
                                 return new OriginalWorker(scriptURL, options)
