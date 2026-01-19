@@ -2,7 +2,7 @@
 // @name         Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的网页视频、直播、番剧的播放源
 // @namespace    CCB
 // @license      MIT
-// @version      1.1.9
+// @version      1.1.10
 // @description  修改哔哩哔哩的视频播放源 - 部署于 GitHub Action 版本
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
@@ -62,7 +62,7 @@ const getPowerMode = () => {
 
 // 获取直播模式状态
 const getLiveMode = () => {
-    return GM_getValue(liveModeStored, true)
+    return GM_getValue(liveModeStored, false)
 }
 
 // 初始默认 CDN 列表
