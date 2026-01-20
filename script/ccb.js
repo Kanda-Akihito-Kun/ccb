@@ -2,7 +2,7 @@
 // @name         Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的网页视频、直播、番剧的播放源
 // @namespace    CCB
 // @license      MIT
-// @version      1.1.10
+// @version      1.1.11
 // @description  修改哔哩哔哩的视频播放源 - 部署于 GitHub Action 版本
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
@@ -854,7 +854,7 @@ function fromHTML(html) {
     }
     
     // 初始化菜单命令
-    updateMenuCommand()
+    if (window.top === window) updateMenuCommand()
 
     const liveBootstrapSeen = new WeakSet()
     const installLiveBootstrapHooks = () => {
