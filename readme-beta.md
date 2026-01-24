@@ -108,7 +108,7 @@ https://github.com/Kanda-Akihito-Kun/ccb
 https://greasyfork.org/zh-CN/scripts/527498-custom-cdn-of-bilibili-ccb-%E4%BF%AE%E6%94%B9%E5%93%94%E5%93%A9%E5%93%94%E5%93%A9%E7%9A%84%E8%A7%86%E9%A2%91%E6%92%AD%E6%94%BE%E6%BA%90?locale_override=1
 
 beta版：
-
+https://greasyfork.org/en/scripts/563901-custom-cdn-of-bilibili-ccb-%E4%BF%AE%E6%94%B9%E5%93%94%E5%93%A9%E5%93%94%E5%93%A9%E7%9A%84%E7%BD%91%E9%A1%B5%E8%A7%86%E9%A2%91-%E7%9B%B4%E6%92%AD-%E7%95%AA%E5%89%A7%E7%9A%84%E6%92%AD%E6%94%BE%E6%BA%90-beta
 
 
 ## 联系方式和其他
