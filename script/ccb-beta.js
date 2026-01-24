@@ -1,5 +1,6 @@
 // ==UserScript==
-// @name         Custom CDN of Bilibili (CCB)
+// @name         Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的网页视频、直播、番剧的播放源 ⭐ Beta
+// @description  Custom CDN of Bilibili (CCB) Beta 版本
 // @namespace    CCB
 // @license      MIT
 // @version      2.0.0
