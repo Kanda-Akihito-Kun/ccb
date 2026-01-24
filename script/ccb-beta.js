@@ -573,18 +573,6 @@
         try { transformPlayUrlResponse(obj) } catch (_) {}
     })
 
-    const ensureHookIframes = () => {
-        if (window.top !== window) return
-        if (location.host !== mainHost) return
-
-        const frames = Array.from(document.querySelectorAll('iframe'))
-        for (const f of frames) {
-            const w = f.contentWindow
-            if (!w) continue
-            if (interceptNetResponse && interceptNetResponse._hookWindow) interceptNetResponse._hookWindow(w)
-        }
-    }
-
     const createButton = (text, primary) => {
         const btn = document.createElement('button')
         btn.textContent = text
