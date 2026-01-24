@@ -2,8 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-#    先注释掉
-#    branches: [ main ]
+    branches: [ main ]
   schedule:
     - cron: '0 21 * * 6'  # 每周日东八区凌晨 5 点 (UTC 的前一天 21 点) 运行
   workflow_dispatch:

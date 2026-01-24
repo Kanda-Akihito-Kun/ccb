@@ -2,8 +2,7 @@ name: Update CDN Data
 
 on:
   push:
-#    先注释掉
-#    branches: [ main ]
+    branches: [ main ]
   schedule:
     - cron: '0 20 * * 6'  # 每周日东八区凌晨 4 点 (UTC 的前一天 20 点) 运行
   workflow_dispatch:  # 允许手动触发
