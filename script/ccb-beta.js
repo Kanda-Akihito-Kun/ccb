@@ -571,7 +571,7 @@
         try { transformPlayUrlResponse(obj) } catch (_) {}
     })
 
-    const createButton = (text, primary) => {
+    const createButton = (text, primary, second) => {
         const btn = document.createElement('button')
         btn.textContent = text
         btn.style.cssText = [
@@ -580,7 +580,7 @@
             'padding:8px 10px',
             'cursor:pointer',
             'color:#fff',
-            `background:${primary ? '#2b74ff' : '#444'}`,
+            `background:${primary ? '#2b74ff' : (second ? '#1bc543ff' : '#444')}`,
         ].join(';')
         return btn
     }
@@ -669,7 +669,7 @@
         const title = document.createElement('div')
         title.textContent = 'CCB 设置'
         title.style.cssText = 'font-weight:700;font-size:13px'
-        const closeBtn = createButton('关闭', false)
+        const closeBtn = createButton('关闭', false, false)
         closeBtn.addEventListener('click', () => { try { root.remove() } catch (_) {} })
         header.appendChild(title)
         header.appendChild(closeBtn)
@@ -769,7 +769,7 @@
         }
 
         const mainBox = mkSectionBox()
-        mainBox.appendChild(mkSectionTitle('视频 | 番剧 | 课堂'))
+        mainBox.appendChild(mkSectionTitle('视频 | 课堂 | 番剧(需特殊设置)'))
         body.appendChild(mainBox)
         await mountRegionAndNode('main', mainBox)
 
@@ -785,19 +785,19 @@
 
         const actions = document.createElement('div')
         actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px'
-        const powerBtn = createButton(getPowerMode() ? '强力替换模式：ON' : '强力替换模式：OFF', true)
+        const powerBtn = createButton(getPowerMode() ? '强力替换模式：ON' : '强力替换模式：OFF', true, false)
         powerBtn.addEventListener('click', () => {
             const next = !getPowerMode()
             GM_setValue(powerModeStored, next)
             powerBtn.textContent = next ? '强力替换模式：ON' : '强力替换模式：OFF'
         })
-        const liveBtn = createButton(getLiveMode() ? '适用直播和番剧：ON' : '适用直播和番剧：OFF', true)
+        const liveBtn = createButton(getLiveMode() ? '适用直播和番剧：ON' : '适用直播和番剧：OFF', true, false)
         liveBtn.addEventListener('click', () => {
             const next = !getLiveMode()
             GM_setValue(liveModeStored, next)
             liveBtn.textContent = next ? '适用直播和番剧：ON' : '适用直播和番剧：OFF'
         })
-        const applyBtn = createButton('应用并刷新', true)
+        const applyBtn = createButton('应用并刷新', false, true)
         applyBtn.addEventListener('click', () => { location.reload() })
         actions.appendChild(powerBtn)
         actions.appendChild(liveBtn)
@@ -811,7 +811,7 @@
         const mainNodeName = getTargetCdnNode('main').replace('.bilivideo.com', '')
         const diagnosticsNodeName = getTargetCdnNode('diagnostics').replace('.bilivideo.com', '')
         const liveNodeName = getTargetCdnNode('live').replace('.bilivideo.com', '')
-        GM_registerMenuCommand(`CCB (${mainNodeName} | ${liveNodeName} | ${diagnosticsNodeName})`, () => { openPanel() })
+        GM_registerMenuCommand(`📺CCB (${mainNodeName} | ${liveNodeName} | ${diagnosticsNodeName})`, () => { openPanel() })
         GM_registerMenuCommand('阅读文档 | 建议反馈 | 版本回退', () => { window.open('https://github.com/Kanda-Akihito-Kun/ccb') })
     }
 
