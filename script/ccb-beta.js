@@ -232,13 +232,11 @@
         if (!obj || typeof obj !== 'object') return
         if (!getReplacementHost()) return
 
-        const rootPlayurl =
+        const playurl =
             (obj && obj.roomInitRes && obj.roomInitRes.data && obj.roomInitRes.data.playurl_info && obj.roomInitRes.data.playurl_info.playurl) ||
             (obj && obj.data && obj.data.playurl_info && obj.data.playurl_info.playurl) ||
             (obj && obj.result && obj.result.playurl_info && obj.result.playurl_info.playurl) ||
             (obj && obj.playurl_info && obj.playurl_info.playurl)
-
-        const playurl = rootPlayurl
         if (!playurl || typeof playurl !== 'object') return
 
         const streams = playurl.stream
@@ -814,6 +812,7 @@
         const diagnosticsNodeName = getTargetCdnNode('diagnostics').replace('.bilivideo.com', '')
         const liveNodeName = getTargetCdnNode('live').replace('.bilivideo.com', '')
         GM_registerMenuCommand(`CCB (${mainNodeName} | ${liveNodeName} | ${diagnosticsNodeName})`, () => { openPanel() })
+        GM_registerMenuCommand('阅读文档 | 建议反馈 | 版本回退', () => { window.open('https://github.com/Kanda-Akihito-Kun/ccb') })
     }
 
     logger('CCB 加载完成', { host: location.host, path: location.pathname })
