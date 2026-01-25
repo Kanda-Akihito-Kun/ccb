@@ -95,7 +95,11 @@
     const getPowerMode = () => GM_getValue(powerModeStored, true)
     const getLiveMode = () => GM_getValue(liveModeStored, false)
     const isCcbEnabled = () => getTargetCdnNode() !== defaultCdnNode
-    const hasMediaDomain = (s) => typeof s === 'string' && (s.indexOf('bilivideo.') !== -1 || s.indexOf('acgvideo.') !== -1)
+    const hasMediaDomain = (s) => typeof s === 'string' && (
+        s.indexOf('bilivideo.') !== -1
+        || s.indexOf('acgvideo.') !== -1
+        || s.indexOf('edge.mountaintoys.cn') !== -1
+    )
 
     const isLiveRoomPage = () => {
         if (location.host !== liveHost) return false
@@ -266,11 +270,11 @@
     const replaceBilivideoInText = (text) => {
         if (!shouldApplyReplacement()) return text
         if (typeof text !== 'string') return text
-        if (text.indexOf('bilivideo.com') === -1 && text.indexOf('acgvideo.com') === -1) return text
-        const out = text.replace(/https?:\/\/[^"'\s]*?\.(?:bilivideo|acgvideo)\.com\//g, getReplacement())
+        if (text.indexOf('bilivideo.') === -1 && text.indexOf('acgvideo.') === -1 && text.indexOf('edge.mountaintoys.cn') === -1) return text
+        const out = text.replace(/https?:\/\/[^"'\s]*?\.(?:(?:bilivideo|acgvideo)\.(?:com|cn)|edge\.mountaintoys\.cn)\//g, getReplacement())
         const host = getReplacementHost()
         if (!host) return out
-        return out.replace(/\b[\w.-]+\.(?:bilivideo|acgvideo)\.com\b/g, host)
+        return out.replace(/\b[\w.-]+\.(?:(?:bilivideo|acgvideo)\.(?:com|cn)|edge\.mountaintoys\.cn)\b/g, host)
     }
 
     const installCcbWorkerRuntime = (cfg) => {
@@ -280,7 +284,11 @@
         const replacementHost = (cfg && typeof cfg.replacementHost === 'string') ? cfg.replacementHost : ''
         const getHost = () => replacementHost
         const IgnoreHostRe = /^(?:bvc|data|pbp|api|api\w+)\./
-        const hasMedia = (s) => typeof s === 'string' && (s.indexOf('bilivideo.') !== -1 || s.indexOf('acgvideo.') !== -1)
+        const hasMedia = (s) => typeof s === 'string' && (
+            s.indexOf('bilivideo.') !== -1
+            || s.indexOf('acgvideo.') !== -1
+            || s.indexOf('edge.mountaintoys.cn') !== -1
+        )
 
         const replaceUrl = (s) => {
             if (typeof s !== 'string') return s
@@ -809,9 +817,10 @@
     }
 
     if (window.top === window) {
-        const mainNodeName = getTargetCdnNode('main').replace('.bilivideo.com', '')
-        const diagnosticsNodeName = getTargetCdnNode('diagnostics').replace('.bilivideo.com', '')
-        const liveNodeName = getTargetCdnNode('live').replace('.bilivideo.com', '')
+        const stripNodeSuffix = (s) => String(s).replace(/(?:\.bilivideo\.(?:com|cn)|\.edge\.mountaintoys\.cn)$/i, '')
+        const mainNodeName = stripNodeSuffix(getTargetCdnNode('main'))
+        const diagnosticsNodeName = stripNodeSuffix(getTargetCdnNode('diagnostics'))
+        const liveNodeName = stripNodeSuffix(getTargetCdnNode('live'))
         GM_registerMenuCommand(`📺CCB (${mainNodeName} | ${liveNodeName} | ${diagnosticsNodeName})`, () => { openPanel() })
         GM_registerMenuCommand('阅读文档 | 建议反馈 | 版本回退', () => { window.open('https://github.com/Kanda-Akihito-Kun/ccb') })
     }
