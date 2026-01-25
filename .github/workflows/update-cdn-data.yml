@@ -7,11 +7,17 @@ on:
     - cron: '0 20 * * 6'  # 每周日东八区凌晨 4 点 (UTC 的前一天 20 点) 运行
   workflow_dispatch:  # 允许手动触发
 
+concurrency:
+  group: update-cdn-data
+  cancel-in-progress: true
+
 jobs:
   update-cdn:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -107,10 +113,15 @@ jobs:
           }
           
           func main() {
+              total := 0
               for i := 0; i < 20; i++ {
                   url := fmt.Sprintf("https://chaziyu.com/ipchaxun.do?domain=bilivideo.com&page=%d", i)
                   client := &http.Client{Timeout: 10 * time.Second}
                   req, err := http.NewRequest("GET", url, nil)
+                  if err != nil {
+                      log.Printf("创建请求失败 [%d]: %v", i, err)
+                      continue
+                  }
 
                   req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
                   req.Header.Set("Accept", "application/json")
@@ -120,6 +131,9 @@ jobs:
                   if err != nil {
                       log.Printf("请求失败 [%d]: %v", i, err)
                       continue
+                  }
+                  if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+                      log.Printf("响应状态异常 [%d]: %s", i, resp.Status)
                   }
 
                   body, err := io.ReadAll(resp.Body)
@@ -134,13 +148,26 @@ jobs:
                       log.Printf("解析JSON失败 [%d]: %v", i, err)
                       continue
                   }
+                  if !response.Status && response.Code != 0 {
+                      log.Printf("接口返回异常 [%d]: code=%d msg=%s", i, response.Code, response.Msg)
+                      continue
+                  }
+                  if len(response.Data.Result) == 0 {
+                      log.Printf("接口返回空列表 [%d]", i)
+                      continue
+                  }
 
                   matchSubDomainToRegion(response)
+                  total += len(response.Data.Result)
               }
           
               // 手动添加
               cdnMap["海外"] = kaigaiCdnList
               cdnMap["福建"] = append(fuzhouCdnList, cdnMap["福建"]...)
+
+              if total < 50 {
+                  log.Fatalf("抓取到的子域数量过少(%d)，疑似被拦截/接口变更，停止覆盖 data/*.json", total)
+              }
           
               // 节点内部排序
               for region := range cdnMap {
@@ -192,5 +219,10 @@ jobs:
           git config --global user.name 'GitHub Action'
           git config --global user.email 'action@github.com'
           git add data/
+          if git diff --cached --quiet; then
+            echo "No changes in data/, skip commit."
+            exit 0
+          fi
           git commit -m "Update CDN data $(date -u)"
+          git pull --rebase origin main
           git push
