@@ -1,5 +1,5 @@
 # Custom CDN of Bilibili (CCB) - 修改哔哩哔哩的网页视频、直播、番剧的播放源
-# ⭐ Beta 测试版
+# ⭐ Beta 测试版(当前版本已更新至正式版)
 
 ## 项目介绍
 
@@ -119,4 +119,4 @@ https://greasyfork.org/en/scripts/563901-custom-cdn-of-bilibili-ccb-%E4%BF%AE%E6
 
 希望有大佬来优化这些ai写的浆糊代码，顺带修bug（
 
-GitHub 提 issue（建议） / B站用户-鼠鼠今天吃嘉然（https://space.bilibili.com/3220012） / ~~线下真实~~
+GitHub 提 issue / B站用户-鼠鼠今天吃嘉然（https://space.bilibili.com/3220012） / ~~线下真实~~

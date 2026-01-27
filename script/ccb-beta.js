@@ -23,6 +23,10 @@
 // @grant        unsafeWindow
 // ==/UserScript==
 
+/**
+ * 当前版本代码已更新至正式版
+ */
+
 ;(() => {
     const api = 'https://kanda-akihito-kun.github.io/ccb/api'
     const defaultCdnNode = '使用默认源'
