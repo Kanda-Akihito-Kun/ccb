@@ -9,13 +9,7 @@
 
 ## 本期更新
 
-1. ⭐ 修改UI，改为油猴脚本的设置框处（见下方的图）；
-
-2. 视频、直播、测速，三者的链接拆开，可单独设置；
-
-3. 添加 edge.mountaintoys.cn 的适配；
-
-4. 修复目前已知bug；
+1. 新增拦截规则：akamaized.net;
 
 <img width="720" src="https://github.com/user-attachments/assets/f8f9f88c-6a41-4c71-b72c-d82dc78a5dd9" />
 

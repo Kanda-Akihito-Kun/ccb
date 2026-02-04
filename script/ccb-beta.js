@@ -3,7 +3,7 @@
 // @description  Custom CDN of Bilibili (CCB) Beta 版本
 // @namespace    CCB
 // @license      MIT
-// @version      2.0.1
+// @version      2.0.2
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
 // @match        https://www.bilibili.com/video/*
@@ -22,10 +22,6 @@
 // @grant        GM_registerMenuCommand
 // @grant        unsafeWindow
 // ==/UserScript==
-
-/**
- * 当前版本代码已更新至正式版
- */
 
 ;(() => {
     const api = 'https://kanda-akihito-kun.github.io/ccb/api'
@@ -103,6 +99,7 @@
         s.indexOf('bilivideo.') !== -1
         || s.indexOf('acgvideo.') !== -1
         || s.indexOf('edge.mountaintoys.cn') !== -1
+        || s.indexOf('akamaized.net') !== -1
     )
 
     const isLiveRoomPage = () => {
@@ -274,11 +271,15 @@
     const replaceBilivideoInText = (text) => {
         if (!shouldApplyReplacement()) return text
         if (typeof text !== 'string') return text
-        if (text.indexOf('bilivideo.') === -1 && text.indexOf('acgvideo.') === -1 && text.indexOf('edge.mountaintoys.cn') === -1) return text
-        const out = text.replace(/https?:\/\/[^"'\s]*?\.(?:(?:bilivideo|acgvideo)\.(?:com|cn)|edge\.mountaintoys\.cn)\//g, getReplacement())
+        if (text.indexOf('bilivideo.') === -1
+            && text.indexOf('acgvideo.') === -1
+            && text.indexOf('edge.mountaintoys.cn') === -1
+            && text.indexOf('akamaized.net') === -1
+        ) return text
+        const out = text.replace(/https?:\/\/[^"'\s]*?\.(?:(?:bilivideo|acgvideo)\.(?:com|cn)|edge\.mountaintoys\.cn|akamaized\.net)\//g, getReplacement())
         const host = getReplacementHost()
         if (!host) return out
-        return out.replace(/\b[\w.-]+\.(?:(?:bilivideo|acgvideo)\.(?:com|cn)|edge\.mountaintoys\.cn)\b/g, host)
+        return out.replace(/\b[\w.-]+\.(?:(?:bilivideo|acgvideo)\.(?:com|cn)|edge\.mountaintoys\.cn|akamaized\.net)\b/g, host)
     }
 
     const installCcbWorkerRuntime = (cfg) => {
@@ -292,6 +293,7 @@
             s.indexOf('bilivideo.') !== -1
             || s.indexOf('acgvideo.') !== -1
             || s.indexOf('edge.mountaintoys.cn') !== -1
+            || s.indexOf('akamaized.net') !== -1
         )
 
         const replaceUrl = (s) => {
