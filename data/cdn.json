@@ -12,7 +12,6 @@
   "北京": [
     "cn-bj-cc-03-14.bilivideo.com",
     "cn-bj-cc-03-17.bilivideo.com",
-    "cn-bj-fx-01-01.bilivideo.com",
     "cn-bj-fx-01-04.bilivideo.com",
     "cn-bj-fx-01-05.bilivideo.com",
     "cn-bj-se-01-05.bilivideo.com"
@@ -43,6 +42,7 @@
   "外建": [
     "c0--cn-gotcha01.bilivideo.com",
     "d0--cn-gotcha09.bilivideo.com",
+    "d1--cn-gotcha04b.bilivideo.com",
     "d1--cn-gotcha07b.bilivideo.com",
     "d1--cn-gotcha101.bilivideo.com",
     "d1--cn-gotcha102.bilivideo.com",
@@ -187,6 +187,7 @@
     "upos-sz-mirroraliov.bilivideo.com",
     "upos-sz-mirrorbd.bilivideo.com",
     "upos-sz-mirrorcf1ov.bilivideo.com",
+    "upos-sz-mirrorcosbstar.bilivideo.com",
     "upos-sz-mirrorcosdisp.bilivideo.com",
     "upos-sz-mirrorctos.bilivideo.com",
     "upos-sz-mirrorhwdisp.bilivideo.com",
