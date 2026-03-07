@@ -1,5 +1,6 @@
 {
   "上海": [
+    "cn-sh-ct-01-01.bilivideo.com",
     "cn-sh-ct-01-06.bilivideo.com",
     "cn-sh-ct-01-13.bilivideo.com",
     "cn-sh-ct-01-15.bilivideo.com",
@@ -47,7 +48,6 @@
     "d1--cn-gotcha101.bilivideo.com",
     "d1--cn-gotcha102.bilivideo.com",
     "d1--cn-gotcha204-1.bilivideo.com",
-    "d1--cn-gotcha204-2.bilivideo.com",
     "d1--cn-gotcha204-3.bilivideo.com",
     "d1--cn-gotcha204-4.bilivideo.com",
     "d1--cn-gotcha207.bilivideo.com",
@@ -178,6 +178,7 @@
     "upos-sz-mirrorcosov.bilivideo.com"
   ],
   "深圳": [
+    "upos-sz-302kodo.bilivideo.com",
     "upos-sz-dynqn.bilivideo.com",
     "upos-sz-estgcos.bilivideo.com",
     "upos-sz-estghw.bilivideo.com",
