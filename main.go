@@ -40,6 +40,7 @@ var (
 		{Abbr: "jsnj", Name: "南京"},
 		{Abbr: "tj", Name: "天津"},
 		{Abbr: "hbwh", Name: "武汉"},
+		{Abbr: "hbsjz", Name: "河北"},
 		{Abbr: "fj", Name: "福建"},
 		{Abbr: "hnzz", Name: "郑州"},
 		{Abbr: "sxxa", Name: "西安"},
