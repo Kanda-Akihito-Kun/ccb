@@ -1,4 +1,15 @@
 {
+  "东莞": [
+    "cn-gddg-cm-01-02.bilivideo.com",
+    "cn-gddg-cm-01-03.bilivideo.com",
+    "cn-gddg-cm-01-04.bilivideo.com",
+    "cn-gddg-cm-01-05.bilivideo.com",
+    "cn-gddg-cm-01-06.bilivideo.com",
+    "cn-gddg-cm-01-13.bilivideo.com",
+    "cn-gddg-cm-01-14.bilivideo.com",
+    "cn-gddg-cm-01-18.bilivideo.com",
+    "cn-gddg-cu-01-06.bilivideo.com"
+  ],
   "北京": [
     "cn-bj-se-01-03.bilivideo.com",
     "cn-bj-se-01-04.bilivideo.com",
@@ -255,6 +266,24 @@
     "cn-hnzz-cm-01-14.bilivideo.com",
     "cn-hnzz-cm-01-15.bilivideo.com",
     "cn-hnzz-cm-01-16.bilivideo.com"
+  ],
+  "长沙": [
+    "cn-hncs-cm-03-01.bilivideo.com",
+    "cn-hncs-cm-03-04.bilivideo.com",
+    "cn-hncs-cm-03-05.bilivideo.com",
+    "cn-hncs-cm-03-08.bilivideo.com",
+    "cn-hncs-cm-03-09.bilivideo.com",
+    "cn-hncs-cm-03-11.bilivideo.com",
+    "cn-hncs-cm-03-12.bilivideo.com",
+    "cn-hncs-cu-01-01.bilivideo.com",
+    "cn-hncs-cu-01-02.bilivideo.com",
+    "cn-hncs-cu-01-03.bilivideo.com",
+    "cn-hncs-cu-01-04.bilivideo.com",
+    "cn-hncs-cu-01-05.bilivideo.com",
+    "cn-hncs-cu-01-06.bilivideo.com",
+    "cn-hncs-cu-01-07.bilivideo.com",
+    "cn-hncs-cu-01-09.bilivideo.com",
+    "cn-hncs-cu-01-10.bilivideo.com"
   ],
   "香港": [
     "cn-hk-eq-01-06.bilivideo.com",
