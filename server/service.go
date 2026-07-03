@@ -13,8 +13,13 @@ import (
 )
 
 func fillRegionList() {
+	seen := make(map[string]bool)
 	for _, v := range regionPatternMap {
+		if seen[v.Name] {
+			continue
+		}
 		regionList = append(regionList, v.Name)
+		seen[v.Name] = true
 	}
 }
 

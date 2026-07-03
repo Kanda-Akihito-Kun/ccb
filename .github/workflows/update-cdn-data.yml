@@ -71,33 +71,31 @@ jobs:
 
           var (
             regionPatternMap = []Region{
-              {Abbr: "bj", Name: "北京"},
-              {Abbr: "sh", Name: "上海"},
-              {Abbr: "gdgz", Name: "广州"},
-              {Abbr: "gddg", Name: "东莞"},
-              {Abbr: "gdjm", Name: "江门"},
-              {Abbr: "sz", Name: "深圳"},
-              {Abbr: "zjhz", Name: "杭州"},
-              {Abbr: "sccd", Name: "成都"},
-              {Abbr: "jsnj", Name: "南京"},
-              {Abbr: "tj", Name: "天津"},
-              {Abbr: "hbwh", Name: "武汉"},
-              {Abbr: "hbsjz", Name: "河北"},
-              {Abbr: "hblf", Name: "廊坊"},
-              {Abbr: "hncs", Name: "长沙"},
-              {Abbr: "fj", Name: "福建"},
-              {Abbr: "hnzz", Name: "郑州"},
-              {Abbr: "jxnc", Name: "南昌"},
-              {Abbr: "sdjn", Name: "济南"},
-              {Abbr: "sxty", Name: "太原"},
-              {Abbr: "sxxa", Name: "西安"},
-              {Abbr: "lnsy", Name: "沈阳"},
-              {Abbr: "hljheb", Name: "哈市"},
-              {Abbr: "nmghhht", Name: "呼市"},
-              {Abbr: "xj", Name: "新疆"},
-              {Abbr: "gotcha", Name: "外建"},
-              {Abbr: "hk", Name: "香港"},
-              {Abbr: "kaigai", Name: "海外"},
+              {Abbr: "-bj", Name: "北京"},
+              {Abbr: "-sh-", Name: "上海"},
+              {Abbr: "-gd", Name: "广东"},
+              {Abbr: "-sz-", Name: "深圳"},
+              {Abbr: "-zjhz-", Name: "浙江"},
+              {Abbr: "-sccd-", Name: "四川"},
+              {Abbr: "-jsnj-", Name: "江苏"},
+              {Abbr: "-tj-", Name: "天津"},
+              {Abbr: "-hbwh-", Name: "湖北"},
+              {Abbr: "-hbsjz-", Name: "河北"},
+              {Abbr: "-hblf-", Name: "河北"},
+              {Abbr: "-hncs-", Name: "湖南"},
+              {Abbr: "-fj", Name: "福建"},
+              {Abbr: "-hnzz-", Name: "河南"},
+              {Abbr: "-jxnc-", Name: "江西"},
+              {Abbr: "-sdjn-", Name: "山东"},
+              {Abbr: "-sxty-", Name: "山西"},
+              {Abbr: "-sxxa-", Name: "陕西"},
+              {Abbr: "-lnsy-", Name: "辽宁"},
+              {Abbr: "-hljheb-", Name: "黑龙江"},
+              {Abbr: "-nmghhht-", Name: "内蒙古"},
+              {Abbr: "-xj-", Name: "新疆"},
+              {Abbr: "-gotcha", Name: "外建"},
+              {Abbr: "-hk-", Name: "香港"},
+              {Abbr: "-kaigai-", Name: "海外"},
             }
 
             kaigaiCdnList = []string{
@@ -321,8 +319,13 @@ jobs:
             }
 
             var regionList []string
+            seenRegions := make(map[string]bool)
             for _, v := range regionPatternMap {
+              if seenRegions[v.Name] {
+                continue
+              }
               regionList = append(regionList, v.Name)
+              seenRegions[v.Name] = true
             }
 
             os.MkdirAll("data", 0755)
