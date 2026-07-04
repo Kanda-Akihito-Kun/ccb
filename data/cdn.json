@@ -32,14 +32,6 @@
     "cn-bj-se-01-05.bilivideo.com",
     "cn-bj-se-01-06.bilivideo.com"
   ],
-  "重庆": [
-    "cn-cq-ct-01-01.bilivideo.com",
-    "cn-cq-ct-01-02.bilivideo.com",
-    "cn-cq-ct-01-03.bilivideo.com",
-    "cn-cq-cm-01-01.bilivideo.com",
-    "cn-cq-cm-01-02.bilivideo.com",
-    "cn-cq-cm-01-03.bilivideo.com"
-  ],
   "四川": [
     "cn-sccd-cm-03-01.bilivideo.com",
     "cn-sccd-cm-03-02.bilivideo.com",
@@ -279,11 +271,11 @@
     "cn-zjhz-cu-v-02.bilivideo.com"
   ],
   "海外": [
+    "cn-jxnc-cmcc-bcache-06.bilivideo.com",
     "upos-hz-mirrorakam.akamaized.net",
     "upos-sz-mirror08h.bilivideo.com",
     "upos-sz-mirroraliov.bilivideo.com",
-    "upos-sz-mirrorcosov.bilivideo.com",
-    "cn-jxnc-cmcc-bcache-06.bilivideo.com"
+    "upos-sz-mirrorcosov.bilivideo.com"
   ],
   "深圳": [
     "upos-sz-302kodo.bilivideo.com",
@@ -396,6 +388,14 @@
     "cn-lnsy-cu-01-04.bilivideo.com",
     "cn-lnsy-cu-01-06.bilivideo.com",
     "cn-lnsy-cu-01-07.bilivideo.com"
+  ],
+  "重庆": [
+    "cn-cq-cm-01-01.bilivideo.com",
+    "cn-cq-cm-01-02.bilivideo.com",
+    "cn-cq-cm-01-03.bilivideo.com",
+    "cn-cq-ct-01-01.bilivideo.com",
+    "cn-cq-ct-01-02.bilivideo.com",
+    "cn-cq-ct-01-03.bilivideo.com"
   ],
   "陕西": [
     "cn-sxxa-cm-01-01.bilivideo.com",
