@@ -42,6 +42,8 @@ var (
 		"upos-hz-mirrorakam.akamaized.net",
 		"upos-sz-mirroraliov.bilivideo.com",
 		"upos-sz-mirrorcosov.bilivideo.com",
+		"upos-sz-mirrorcosov.bilivideo.com",
+		"upos-sz-mirror08h.bilivideo.com",
 	}
 
 	fuzhouCdnList = []string{
