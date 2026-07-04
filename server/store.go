@@ -20,6 +20,7 @@ var (
 		{Abbr: "-hlj", Name: "黑省"},
 		{Abbr: "-hnzz-", Name: "河南"},
 		{Abbr: "-hbwh-", Name: "湖北"},
+		{Abbr: "-hbyc-", Name: "湖北"},
 		{Abbr: "-hncs-", Name: "湖南"},
 		{Abbr: "-jsnj-", Name: "江苏"},
 		{Abbr: "-jssz-", Name: "江苏"},
