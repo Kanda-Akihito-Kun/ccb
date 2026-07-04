@@ -8,24 +8,32 @@ type Region struct {
 }
 
 var (
-	// 如果要自行添加地区, 就在这里加
+	// 如果要自行添加地区, 就在这里加, 写入 region 的时候要去重合并
 	regionPatternMap = []Region{
 		{Abbr: "-bj", Name: "北京"},
 		{Abbr: "-sh-", Name: "上海"},
-		{Abbr: "-gdgz-", Name: "广州"},
+		{Abbr: "-gd", Name: "广东"},
 		{Abbr: "-sz-", Name: "深圳"},
-		{Abbr: "-zjhz-", Name: "杭州"},
-		{Abbr: "-sccd-", Name: "成都"},
-		{Abbr: "-jsnj-", Name: "南京"},
-		{Abbr: "-tj-", Name: "天津"},
-		{Abbr: "-hbwh-", Name: "武汉"},
 		{Abbr: "-fj", Name: "福建"},
-		{Abbr: "-hnzz-", Name: "郑州"},
-		{Abbr: "-sxxa-", Name: "西安"},
-		{Abbr: "-lnsy-", Name: "沈阳"},
-		{Abbr: "-hljheb-", Name: "哈市"},
-		{Abbr: "-nmghhht-", Name: "呼市"},
+		{Abbr: "-hbsjz-", Name: "河北"},
+		{Abbr: "-hblf-", Name: "河北"},
+		{Abbr: "-hlj", Name: "黑省"},
+		{Abbr: "-hnzz-", Name: "河南"},
+		{Abbr: "-hbwh-", Name: "湖北"},
+		{Abbr: "-hncs-", Name: "湖南"},
+		{Abbr: "-jsnj-", Name: "江苏"},
+		{Abbr: "-jssz-", Name: "江苏"},
+		{Abbr: "-jx", Name: "江西"},
+		{Abbr: "-ln", Name: "辽宁"},
+		{Abbr: "-nmg", Name: "内蒙"},
+		{Abbr: "-sd", Name: "山东"},
+		{Abbr: "-sxty-", Name: "山西"},
+		{Abbr: "-sxxa-", Name: "陕西"},
+		{Abbr: "-sc", Name: "四川"},
+		{Abbr: "-cq", Name: "重庆"},
+		{Abbr: "-tj-", Name: "天津"},
 		{Abbr: "-xj-", Name: "新疆"},
+		{Abbr: "-zj", Name: "浙江"},
 		{Abbr: "-gotcha", Name: "外建"},
 		{Abbr: "-hk-", Name: "香港"},
 		{Abbr: "-kaigai-", Name: "海外"},
@@ -35,6 +43,8 @@ var (
 		"upos-hz-mirrorakam.akamaized.net",
 		"upos-sz-mirroraliov.bilivideo.com",
 		"upos-sz-mirrorcosov.bilivideo.com",
+		"upos-sz-mirrorcosov.bilivideo.com",
+		"upos-sz-mirror08h.bilivideo.com",
 	}
 
 	fuzhouCdnList = []string{
