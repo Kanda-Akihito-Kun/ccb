@@ -31,11 +31,16 @@ func normalizeSubdomain(subDomain string) string {
 	return subDomain + ".bilivideo.com"
 }
 
+func isUnsafeCdnNode(subDomain string) bool {
+	subDomain = strings.ToLower(subDomain)
+	return strings.Contains(subDomain, "origin") || strings.Contains(subDomain, "all")
+}
+
 func addCdnNode(region string, subDomain string) bool {
 	if subDomain == "" {
 		return false
 	}
-	if strings.Contains(strings.ToLower(subDomain), "origin") {
+	if isUnsafeCdnNode(subDomain) {
 		return false
 	}
 	for _, existing := range cdnMap[region] {

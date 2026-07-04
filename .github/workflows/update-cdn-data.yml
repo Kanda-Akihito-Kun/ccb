@@ -127,11 +127,16 @@ jobs:
             return subDomain + ".bilivideo.com"
           }
 
+          func isUnsafeCdnNode(subDomain string) bool {
+            subDomain = strings.ToLower(subDomain)
+            return strings.Contains(subDomain, "origin") || strings.Contains(subDomain, "all")
+          }
+
           func addCdnNode(region string, subDomain string) bool {
             if subDomain == "" {
               return false
             }
-            if strings.Contains(strings.ToLower(subDomain), "origin") {
+            if isUnsafeCdnNode(subDomain) {
               return false
             }
             for _, existing := range cdnMap[region] {
@@ -158,7 +163,7 @@ jobs:
             for region, nodes := range cdnMap {
               kept := nodes[:0]
               for _, node := range nodes {
-                if strings.Contains(strings.ToLower(node), "origin") {
+                if isUnsafeCdnNode(node) {
                   removed++
                   continue
                 }
@@ -320,7 +325,7 @@ jobs:
               log.Printf("读取现有 data/cdn.json 失败，将仅在接口成功时生成新数据: %v", err)
             }
             if removed := removeUnsafeCdnNodes(); removed > 0 {
-              log.Printf("已移除 %d 个包含 origin 的危险节点", removed)
+              log.Printf("已移除 %d 个包含 origin/all 的危险节点", removed)
             }
 
             fetchSucceeded := false
