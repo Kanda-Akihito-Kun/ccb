@@ -35,6 +35,9 @@ func addCdnNode(region string, subDomain string) bool {
 	if subDomain == "" {
 		return false
 	}
+	if strings.Contains(strings.ToLower(subDomain), "origin") {
+		return false
+	}
 	for _, existing := range cdnMap[region] {
 		if existing == subDomain {
 			return false

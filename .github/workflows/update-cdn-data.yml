@@ -82,7 +82,8 @@ jobs:
               {Abbr: "-hnzz-", Name: "河南"},
               {Abbr: "-hbwh-", Name: "湖北"},
               {Abbr: "-hncs-", Name: "湖南"},
-              {Abbr: "-js", Name: "江苏"},
+              {Abbr: "-jsnj-", Name: "江苏"},
+              {Abbr: "-jssz-", Name: "江苏"},
               {Abbr: "-jx", Name: "江西"},
               {Abbr: "-ln", Name: "辽宁"},
               {Abbr: "-nmg", Name: "内蒙"},
@@ -130,6 +131,9 @@ jobs:
             if subDomain == "" {
               return false
             }
+            if strings.Contains(strings.ToLower(subDomain), "origin") {
+              return false
+            }
             for _, existing := range cdnMap[region] {
               if existing == subDomain {
                 return false
@@ -147,6 +151,22 @@ jobs:
               }
             }
             return added
+          }
+
+          func removeUnsafeCdnNodes() int {
+            removed := 0
+            for region, nodes := range cdnMap {
+              kept := nodes[:0]
+              for _, node := range nodes {
+                if strings.Contains(strings.ToLower(node), "origin") {
+                  removed++
+                  continue
+                }
+                kept = append(kept, node)
+              }
+              cdnMap[region] = kept
+            }
+            return removed
           }
 
           func matchSubDomainsToRegion(subDomains []string) int {
@@ -298,6 +318,9 @@ jobs:
           func main() {
             if err := readExistingCdnData(); err != nil {
               log.Printf("读取现有 data/cdn.json 失败，将仅在接口成功时生成新数据: %v", err)
+            }
+            if removed := removeUnsafeCdnNodes(); removed > 0 {
+              log.Printf("已移除 %d 个包含 origin 的危险节点", removed)
             }
 
             fetchSucceeded := false
