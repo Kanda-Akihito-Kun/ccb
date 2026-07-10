@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/chromedp/chromedp"
 )
 
 type Region struct {
@@ -160,37 +163,50 @@ func matchSubDomainsToRegion(subDomains []string) int {
 func fetchChaziyuSubDomains() ([]string, error) {
 	var subDomains []string
 
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"),
+	)
+
+	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 120*time.Second)
+	defer cancel()
+
 	for i := 0; i < 20; i++ {
+		if i > 0 {
+			time.Sleep(2 * time.Second)
+		}
+
 		url := fmt.Sprintf("https://chaziyu.com/ipchaxun.do?domain=bilivideo.com&page=%d", i)
-		client := &http.Client{Timeout: 10 * time.Second}
-		req, err := http.NewRequest("GET", url, nil)
+		var rawJSON string
+
+		err := chromedp.Run(ctx,
+			chromedp.Navigate(url),
+			chromedp.WaitVisible("body", chromedp.ByQuery),
+			chromedp.Sleep(3*time.Second),
+			chromedp.Evaluate(`document.body.innerText`, &rawJSON),
+		)
 		if err != nil {
-			log.Printf("创建 chaziyu 请求失败 [%d]: %v", i, err)
+			log.Printf("chaziyu 浏览器请求失败 [%d]: %v", i, err)
 			continue
 		}
 
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("Referer", "https://chaziyu.com")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Printf("chaziyu 请求失败 [%d]: %v", i, err)
-			continue
-		}
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			log.Printf("chaziyu 响应状态异常 [%d]: %s", i, resp.Status)
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			log.Printf("读取 chaziyu 响应失败 [%d]: %v", i, err)
+		rawJSON = strings.TrimSpace(rawJSON)
+		if rawJSON == "" {
+			log.Printf("chaziyu 页面内容为空 [%d]", i)
 			continue
 		}
 
 		var response ChaziyuResponse
-		if err := json.Unmarshal(body, &response); err != nil {
+		if err := json.Unmarshal([]byte(rawJSON), &response); err != nil {
 			log.Printf("解析 chaziyu JSON 失败 [%d]: %v", i, err)
 			continue
 		}
@@ -200,6 +216,7 @@ func fetchChaziyuSubDomains() ([]string, error) {
 		}
 
 		subDomains = append(subDomains, response.Data.Result...)
+		log.Printf("chaziyu 第 %d 页获取 %d 个子域", i, len(response.Data.Result))
 	}
 
 	if len(subDomains) < 50 {
