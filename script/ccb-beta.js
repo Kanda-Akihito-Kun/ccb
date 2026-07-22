@@ -3,7 +3,7 @@
 // @description  Custom CDN of Bilibili (CCB) Beta 版本
 // @namespace    CCB
 // @license      MIT
-// @version      2.0.2
+// @version      2.0.3
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
 // @match        https://www.bilibili.com/video/*
@@ -720,7 +720,12 @@
         const mkSelect = (options, value) => {
             const sel = document.createElement('select')
             sel.style.cssText = 'flex:1;background:#111;color:#fff;border:1px solid #333;border-radius:8px;padding:8px'
-            sel.innerHTML = options.map(v => `<option value="${v}">${v}</option>`).join('')
+            for (const v of options) {
+                const opt = document.createElement('option')
+                opt.value = v
+                opt.textContent = v
+                sel.appendChild(opt)
+            }
             sel.value = value
             return sel
         }
