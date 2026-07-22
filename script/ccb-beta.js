@@ -12,7 +12,6 @@
 // @match        https://www.bilibili.com/festival/*
 // @match        https://www.bilibili.com/list/*
 // @match        https://live.bilibili.com/*
-// @match        https://www.bilibili.com/blackboard/video-diagnostics.html*
 // @match        https://www.bilibili.com/blackboard/*
 // @match        https://player.bilibili.com/*
 // @connect      kanda-akihito-kun.github.io
