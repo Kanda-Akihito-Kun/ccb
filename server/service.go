@@ -167,7 +167,7 @@ func fetchChaziyuSubDomains() ([]string, error) {
 			log.Printf("解析 chaziyu JSON 失败 [%d]: %v", i, err)
 			continue
 		}
-		if !response.Status && response.Code != 0 {
+		if !response.Status || response.Code != 0 {
 			log.Printf("chaziyu 接口返回异常 [%d]: code=%d msg=%s", i, response.Code, response.Msg)
 			continue
 		}
