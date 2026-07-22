@@ -42,7 +42,7 @@
     const liveModeStored = 'liveMode'
 
     const logger = ((...args) => {
-        console.warn(`[CCB] ${args}`, args)
+        console.warn('[CCB]', ...args)
     })
 
     const UNSET = '__CCB_UNSET__'
