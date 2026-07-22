@@ -125,6 +125,8 @@ func fetchChaziyuSubDomains() ([]string, error) {
 	var subDomains []string
 
 	// 这个接口一次请求不全, 要分页获取
+	// 注意: chaziyu 对非浏览器客户端会返回 200 + 空 result (根目录 update.go 因此改用 headless Chrome),
+	// 此处纯 HTTP 请求大概率取不到数据, 实际依赖 srclab 兜底
 	for i := 0; i < 20; i++ {
 		url := fmt.Sprintf("https://chaziyu.com/ipchaxun.do?domain=bilivideo.com&page=%d", i)
 
