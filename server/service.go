@@ -126,6 +126,8 @@ func fetchChaziyuSubDomains() ([]string, error) {
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			log.Printf("chaziyu 响应状态异常 [%d]: %s", i, resp.Status)
+			resp.Body.Close()
+			continue
 		}
 
 		body, err := io.ReadAll(resp.Body)
