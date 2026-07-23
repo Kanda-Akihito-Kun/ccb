@@ -144,11 +144,34 @@ func removeUnsafeCdnNodes() int {
 	return removed
 }
 
+func isKaigaiMirror(subDomain string) bool {
+	for _, mirror := range kaigaiCdnList {
+		if mirror == subDomain {
+			return true
+		}
+	}
+	return false
+}
+
+// 按缩写从长到短匹配，避免短缩写（如 -gd）抢先命中更具体的子域（如 cn-jsnj-gd-*）
+func sortedRegionPatterns() []Region {
+	patterns := append([]Region(nil), regionPatternMap...)
+	sort.SliceStable(patterns, func(i, j int) bool {
+		return len(patterns[i].Abbr) > len(patterns[j].Abbr)
+	})
+	return patterns
+}
+
 func matchSubDomainsToRegion(subDomains []string) int {
 	added := 0
+	patterns := sortedRegionPatterns()
 	for _, rawSubDomain := range subDomains {
 		subDomain := normalizeSubdomain(rawSubDomain)
-		for _, v := range regionPatternMap {
+		// 海外镜像节点由 kaigaiCdnList 显式归入海外，不参与地区匹配
+		if isKaigaiMirror(subDomain) {
+			continue
+		}
+		for _, v := range patterns {
 			if strings.Contains(subDomain, v.Abbr) {
 				if addCdnNode(v.Name, subDomain) {
 					added++
@@ -210,7 +233,7 @@ func fetchChaziyuSubDomains() ([]string, error) {
 			log.Printf("解析 chaziyu JSON 失败 [%d]: %v", i, err)
 			continue
 		}
-		if !response.Status && response.Code != 0 {
+		if !response.Status || response.Code != 0 {
 			log.Printf("chaziyu 接口返回异常 [%d]: code=%d msg=%s", i, response.Code, response.Msg)
 			continue
 		}

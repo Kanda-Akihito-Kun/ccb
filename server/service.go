@@ -62,11 +62,34 @@ func addCdnNodes(region string, subDomains []string) int {
 	return added
 }
 
+func isKaigaiMirror(subDomain string) bool {
+	for _, mirror := range kaigaiCdnList {
+		if mirror == subDomain {
+			return true
+		}
+	}
+	return false
+}
+
+// 按缩写从长到短匹配，避免短缩写（如 -gd）抢先命中更具体的子域（如 cn-jsnj-gd-*）
+func sortedRegionPatterns() []Region {
+	patterns := append([]Region(nil), regionPatternMap...)
+	sort.SliceStable(patterns, func(i, j int) bool {
+		return len(patterns[i].Abbr) > len(patterns[j].Abbr)
+	})
+	return patterns
+}
+
 func matchSubDomainsToRegion(subDomains []string) int {
 	added := 0
+	patterns := sortedRegionPatterns()
 	for _, rawSubDomain := range subDomains {
 		subDomain := normalizeSubdomain(rawSubDomain)
-		for _, v := range regionPatternMap {
+		// 海外镜像节点由 kaigaiCdnList 显式归入海外，不参与地区匹配
+		if isKaigaiMirror(subDomain) {
+			continue
+		}
+		for _, v := range patterns {
 			if strings.Contains(subDomain, v.Abbr) {
 				if addCdnNode(v.Name, subDomain) {
 					added++
@@ -102,6 +125,8 @@ func fetchChaziyuSubDomains() ([]string, error) {
 	var subDomains []string
 
 	// 这个接口一次请求不全, 要分页获取
+	// 注意: chaziyu 对非浏览器客户端会返回 200 + 空 result (根目录 update.go 因此改用 headless Chrome),
+	// 此处纯 HTTP 请求大概率取不到数据, 实际依赖 srclab 兜底
 	for i := 0; i < 20; i++ {
 		url := fmt.Sprintf("https://chaziyu.com/ipchaxun.do?domain=bilivideo.com&page=%d", i)
 
@@ -126,6 +151,8 @@ func fetchChaziyuSubDomains() ([]string, error) {
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			log.Printf("chaziyu 响应状态异常 [%d]: %s", i, resp.Status)
+			resp.Body.Close()
+			continue
 		}
 
 		body, err := io.ReadAll(resp.Body)
@@ -140,7 +167,7 @@ func fetchChaziyuSubDomains() ([]string, error) {
 			log.Printf("解析 chaziyu JSON 失败 [%d]: %v", i, err)
 			continue
 		}
-		if !response.Status && response.Code != 0 {
+		if !response.Status || response.Code != 0 {
 			log.Printf("chaziyu 接口返回异常 [%d]: code=%d msg=%s", i, response.Code, response.Msg)
 			continue
 		}
