@@ -672,29 +672,23 @@
 
     const requestJson = async (url) => JSON.parse(await requestText(url))
 
-    const renderRegionOptions = (selectEl, regions) => {
-        const value = selectEl.value
+    const renderSelectOptions = (selectEl, values, preferred) => {
+        const current = selectEl.value
         selectEl.textContent = ''
-        for (const region of regions) {
+        for (const v of values) {
             const opt = document.createElement('option')
-            opt.value = region
-            opt.textContent = region
+            opt.value = v
+            opt.textContent = v
             selectEl.appendChild(opt)
         }
-        if (regions.includes(value)) selectEl.value = value
+        // 优先恢复已保存的选择,其次沿用当前选中项
+        if (values.includes(preferred)) selectEl.value = preferred
+        else if (values.includes(current)) selectEl.value = current
     }
 
-    const renderNodeOptions = (selectEl, nodes) => {
-        const value = selectEl.value
-        selectEl.textContent = ''
-        for (const node of nodes) {
-            const opt = document.createElement('option')
-            opt.value = node
-            opt.textContent = node
-            selectEl.appendChild(opt)
-        }
-        if (nodes.includes(value)) selectEl.value = value
-    }
+    const renderRegionOptions = (selectEl, regions, preferred) => renderSelectOptions(selectEl, regions, preferred)
+
+    const renderNodeOptions = (selectEl, nodes, preferred) => renderSelectOptions(selectEl, nodes, preferred)
 
     const getRegionList = async (onSuccess) => {
         try {
@@ -717,7 +711,6 @@
         } catch (_) {
             if (!cdnDataCache) cdnDataCache = {}
         }
-        return cdnDataCache
     }
 
     const getCdnListByRegion = (region) => {
@@ -748,7 +741,11 @@
         }
         const regionRequest = getRegionList(rerenderRegions)
         const cdnRequest = getCdnData(rerenderNodes)
-        if (!dataCache.region && !dataCache.cdn) await Promise.all([regionRequest, cdnRequest])
+        // 只等待本地没有存档的资源,已有存档的先渲染再后台刷新
+        const pending = []
+        if (!dataCache.region) pending.push(regionRequest)
+        if (!dataCache.cdn) pending.push(cdnRequest)
+        if (pending.length) await Promise.all(pending)
 
         root = document.createElement('div')
         root.id = 'ccb-settings-panel'
@@ -846,7 +843,8 @@
                 nodeInput = null
             }
 
-            const renderNodeControl = (regionValue) => {
+            // persist 仅在用户操作时为 true,后台刷新重绘不写入存储
+            const renderNodeControl = (regionValue, persist) => {
                 if (regionValue === manualRegionName) {
                     if (nodeInput) return
                     clearRowControl()
@@ -863,8 +861,9 @@
 
                 const list = getCdnListByRegion(regionValue)
                 if (nodeSelect) {
-                    renderNodeOptions(nodeSelect, list)
+                    renderNodeOptions(nodeSelect, list, getTargetCdnNode(ctx))
                     nodeValue = nodeSelect.value
+                    if (persist) setTargetCdnNode(ctx, nodeValue)
                     return
                 }
                 clearRowControl()
@@ -876,20 +875,21 @@
                     nodeValue = sel.value
                     setTargetCdnNode(ctx, nodeValue)
                 })
+                if (persist) setTargetCdnNode(ctx, nodeValue)
             }
 
-            renderNodeControl(regionSelect.value)
+            renderNodeControl(regionSelect.value, false)
             regionSelect.addEventListener('change', () => {
                 const next = regionSelect.value
                 setRegion(ctx, next)
-                renderNodeControl(next)
+                renderNodeControl(next, true)
             })
             panelControls.push({
                 renderRegions: () => {
-                    renderRegionOptions(regionSelect, regionList)
-                    renderNodeControl(regionSelect.value)
+                    renderRegionOptions(regionSelect, regionList, getRegion(ctx))
+                    renderNodeControl(regionSelect.value, false)
                 },
-                renderNodes: () => { renderNodeControl(regionSelect.value) },
+                renderNodes: () => { renderNodeControl(regionSelect.value, false) },
             })
         }
 
