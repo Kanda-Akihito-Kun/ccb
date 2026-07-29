@@ -40,6 +40,8 @@
     const powerModeStored = 'powerMode'
     const liveModeStored = 'liveMode'
     const dataCacheStored = 'CCB_datacache'
+    // 多标签页共用同一份统计,靠 frameId 分键和 60 秒新鲜度窗口限制串扰
+    const statsStored = 'CCB_stats'
 
     const logger = ((...args) => {
         console.warn('[CCB]', ...args)
@@ -182,6 +184,72 @@
 
     const getReplacementHost = () => getCcbConfig().replacementHost
 
+    const statsFreshMs = 60000
+    const statsFlushMs = 2000
+    const isTopFrame = window.top === window
+    const ccbFrameId = Math.random().toString(36).slice(2)
+    // 只统计页面框架内的改写,Worker 运行时内部的改写没有回传通道,不计入
+    const ccbRewriteStats = { host: null, count: 0 }
+    let statsFlushTimer = null
+
+    const readStatsStore = () => {
+        let store
+        try {
+            store = GM_getValue(statsStored, {})
+            if (typeof store === 'string') store = JSON.parse(store)
+        } catch (_) {
+            return {}
+        }
+        if (!store || typeof store !== 'object' || Array.isArray(store)) return {}
+        return store
+    }
+
+    const flushRewriteStats = () => {
+        statsFlushTimer = null
+        try {
+            const store = readStatsStore()
+            store[ccbFrameId] = { host: ccbRewriteStats.host, count: ccbRewriteStats.count, ts: Date.now() }
+            GM_setValue(statsStored, store)
+        } catch (_) {}
+    }
+
+    // 改写路径上只累加内存计数,写存储由一次性定时器合并
+    const countRewrite = (before, after) => {
+        if (after === before) return after
+        ccbRewriteStats.count++
+        ccbRewriteStats.host = getReplacementHost() || ccbRewriteStats.host
+        if (!isTopFrame && !statsFlushTimer) statsFlushTimer = setTimeout(flushRewriteStats, statsFlushMs)
+        return after
+    }
+
+    const readAggregateStats = () => {
+        const now = Date.now()
+        const store = readStatsStore()
+        let count = ccbRewriteStats.count
+        let freshestTs = 0
+        let freshestHost = ''
+        let pruned = false
+        for (const key in store) {
+            if (!Object.prototype.hasOwnProperty.call(store, key)) continue
+            const entry = store[key]
+            const ts = entry && typeof entry === 'object' ? entry.ts : NaN
+            if (!Number.isFinite(ts) || now - ts > statsFreshMs) {
+                delete store[key]
+                pruned = true
+                continue
+            }
+            if (Number.isFinite(entry.count)) count += entry.count
+            if (ts >= freshestTs && typeof entry.host === 'string' && entry.host) {
+                freshestTs = ts
+                freshestHost = entry.host
+            }
+        }
+        if (pruned) {
+            try { GM_setValue(statsStored, store) } catch (_) {}
+        }
+        return { count, host: ccbRewriteStats.host || freshestHost }
+    }
+
     const IGNORE_HOST_RE = /^(?:bvc|data|pbp|api|api\w+)\./
     const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)\//i
     function isIgnoredHost(s) {
@@ -191,10 +259,11 @@
     }
 
     const replaceMediaUrlCore = (s) => {
-        if (s.startsWith('http://') || s.startsWith('https://')) return s.replace(/^https?:\/\/.*?\//, getReplacement())
-        if (s.startsWith('//')) return s.replace(/^\/\/.*?\//, getReplacement().replace(/^https?:/, ''))
-        if (/^[^/]+\//.test(s)) return s.replace(/^[^/]+\//, `${getReplacementHost()}/`)
-        return s
+        let out = s
+        if (s.startsWith('http://') || s.startsWith('https://')) out = s.replace(/^https?:\/\/.*?\//, getReplacement())
+        else if (s.startsWith('//')) out = s.replace(/^\/\/.*?\//, getReplacement().replace(/^https?:/, ''))
+        else if (/^[^/]+\//.test(s)) out = s.replace(/^[^/]+\//, `${getReplacementHost()}/`)
+        return countRewrite(s, out)
     }
 
     const replaceMediaUrlUnchecked = (s) => {
@@ -212,10 +281,11 @@
     }
 
     const replaceMediaHostValueCore = (s) => {
-        if (s.startsWith('http://') || s.startsWith('https://')) return getReplacementNoSlash()
-        if (s.startsWith('//')) return getReplacementNoSlash().replace(/^https?:/, '')
-        if (/^[^/]+$/.test(s)) return getReplacementHost()
-        return s
+        let out = s
+        if (s.startsWith('http://') || s.startsWith('https://')) out = getReplacementNoSlash()
+        else if (s.startsWith('//')) out = getReplacementNoSlash().replace(/^https?:/, '')
+        else if (/^[^/]+$/.test(s)) out = getReplacementHost()
+        return countRewrite(s, out)
     }
 
     const replaceMediaHostValueUnchecked = (s) => {
@@ -944,6 +1014,14 @@
                 renderNodes: () => { renderNodeControl(regionSelect.value, false) },
             })
         }
+
+        const stats = readAggregateStats()
+        const statsLine = document.createElement('div')
+        statsLine.style.cssText = 'color:#9c9;margin:0 0 8px'
+        statsLine.textContent = stats.host
+            ? `已改写 ${stats.count} 个媒体请求 → ${stats.host}`
+            : `已改写 ${stats.count} 个媒体请求`
+        body.appendChild(statsLine)
 
         const mainBox = mkSectionBox()
         mainBox.appendChild(mkSectionTitle('视频 | 课堂 | 番剧(需特殊设置)'))
