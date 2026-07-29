@@ -76,25 +76,62 @@
         return 'main'
     }
 
-    const getTargetCdnNode = (ctx = getContextKey()) => GM_getValue(
-        ctx === 'live' ? liveCdnNodeStored : (ctx === 'diagnostics' ? diagnosticsCdnNodeStored : mainCdnNodeStored),
-        GM_getValue(oldCdnNodeStored, defaultCdnNode),
-    )
-    const getRegion = (ctx = getContextKey()) => normalizeRegion(GM_getValue(
-        ctx === 'live' ? liveRegionStored : (ctx === 'diagnostics' ? diagnosticsRegionStored : mainRegionStored),
-        normalizeRegion(GM_getValue(oldRegionStored, manualRegionName)),
-    ))
-    const setTargetCdnNode = (ctx, value) => GM_setValue(
-        ctx === 'live' ? liveCdnNodeStored : (ctx === 'diagnostics' ? diagnosticsCdnNodeStored : mainCdnNodeStored),
-        value,
-    )
-    const setRegion = (ctx, value) => GM_setValue(
-        ctx === 'live' ? liveRegionStored : (ctx === 'diagnostics' ? diagnosticsRegionStored : mainRegionStored),
-        value,
-    )
-    const getPowerMode = () => GM_getValue(powerModeStored, true)
-    const getLiveMode = () => GM_getValue(liveModeStored, false)
-    const isCcbEnabled = () => getTargetCdnNode() !== defaultCdnNode
+    let ccbConfigCache = null
+
+    const getTargetCdnNode = (ctx) => {
+        if (ctx === void 0) return getCcbConfig().node
+        const stored = ctx === 'live' ? liveCdnNodeStored : (ctx === 'diagnostics' ? diagnosticsCdnNodeStored : mainCdnNodeStored)
+        const value = GM_getValue(stored, UNSET)
+        return value === UNSET ? GM_getValue(oldCdnNodeStored, defaultCdnNode) : value
+    }
+    const getRegion = (ctx) => {
+        if (ctx === void 0) return getCcbConfig().region
+        const stored = ctx === 'live' ? liveRegionStored : (ctx === 'diagnostics' ? diagnosticsRegionStored : mainRegionStored)
+        const value = GM_getValue(stored, UNSET)
+        return normalizeRegion(value === UNSET ? GM_getValue(oldRegionStored, manualRegionName) : value)
+    }
+    const setTargetCdnNode = (ctx, value) => {
+        const result = GM_setValue(
+            ctx === 'live' ? liveCdnNodeStored : (ctx === 'diagnostics' ? diagnosticsCdnNodeStored : mainCdnNodeStored),
+            value,
+        )
+        ccbConfigCache = null
+        return result
+    }
+    const setRegion = (ctx, value) => {
+        const result = GM_setValue(
+            ctx === 'live' ? liveRegionStored : (ctx === 'diagnostics' ? diagnosticsRegionStored : mainRegionStored),
+            value,
+        )
+        ccbConfigCache = null
+        return result
+    }
+    const getPowerMode = () => getCcbConfig().powerMode
+    const getLiveMode = () => getCcbConfig().liveMode
+
+    function getCcbConfig() {
+        const contextKey = getContextKey()
+        if (ccbConfigCache && ccbConfigCache.contextKey === contextKey) return ccbConfigCache
+
+        const node = getTargetCdnNode(contextKey)
+        const region = getRegion(contextKey)
+        const powerMode = GM_getValue(powerModeStored, true)
+        const liveMode = GM_getValue(liveModeStored, false)
+        let replacement = node
+        if (replacement.indexOf('://') === -1) replacement = 'https://' + replacement
+        if (!replacement.endsWith('/')) replacement = replacement + '/'
+        const replacementNoSlash = replacement.endsWith('/') ? replacement.slice(0, -1) : replacement
+        let replacementHost
+        try {
+            replacementHost = new URL(replacement).host
+        } catch (_) {
+            replacementHost = ''
+        }
+        ccbConfigCache = { contextKey, node, region, powerMode, liveMode, replacement, replacementNoSlash, replacementHost }
+        return ccbConfigCache
+    }
+
+    const isCcbEnabled = () => getCcbConfig().node !== defaultCdnNode
     const hasMediaDomain = (s) => typeof s === 'string' && (
         s.indexOf('bilivideo.') !== -1
         || s.indexOf('acgvideo.') !== -1
@@ -109,10 +146,11 @@
     }
 
     const shouldApplyReplacement = () => {
-        if (!isCcbEnabled()) return false
+        const config = getCcbConfig()
+        if (config.node === defaultCdnNode) return false
         if (location.host === liveHost) {
             if (!isLiveRoomPage()) return false
-            if (!getLiveMode()) return false
+            if (!config.liveMode) return false
         }
         return true
     }
@@ -130,45 +168,51 @@
         return false
     }
 
-    const getReplacement = () => {
-        let target = getTargetCdnNode()
-        if (target.indexOf('://') === -1) target = 'https://' + target
-        if (!target.endsWith('/')) target = target + '/'
-        return target
-    }
+    const getReplacement = () => getCcbConfig().replacement
 
-    const getReplacementNoSlash = () => {
-        const r = getReplacement()
-        return r.endsWith('/') ? r.slice(0, -1) : r
-    }
+    const getReplacementNoSlash = () => getCcbConfig().replacementNoSlash
 
-    const getReplacementHost = () => {
-        try {
-            return new URL(getReplacement()).host
-        } catch (_) {
-            return ''
-        }
-    }
+    const getReplacementHost = () => getCcbConfig().replacementHost
 
     const IGNORE_HOST_RE = /^(?:bvc|data|pbp|api|api\w+)\./
+    const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)\//
+    function isIgnoredHost(s) {
+        const m = HOST_EXTRACT_RE.exec(s)
+        const host = m && (m[1] || m[2])
+        return !!host && IGNORE_HOST_RE.test(host.toLowerCase())
+    }
+
+    const replaceMediaUrlCore = (s) => {
+        if (s.startsWith('http://') || s.startsWith('https://')) return s.replace(/^https?:\/\/.*?\//, getReplacement())
+        if (s.startsWith('//')) return s.replace(/^\/\/.*?\//, getReplacement().replace(/^https?:/, ''))
+        if (/^[^/]+\//.test(s)) return s.replace(/^[^/]+\//, `${getReplacementHost()}/`)
+        return s
+    }
+
+    const replaceMediaUrlUnchecked = (s) => {
+        if (isIgnoredHost(s)) return s
+        return replaceMediaUrlCore(s)
+    }
 
     const replaceMediaUrl = (s) => {
         if (typeof s !== 'string') return s
         if (!shouldApplyReplacement()) return s
         if (!hasMediaDomain(s)) return s
 
-        try {
-            const u = new URL(s.startsWith('//') ? `https:${s}` : s)
-            if (IGNORE_HOST_RE.test(u.hostname)) return s
-        } catch (_) {
-            const m = s.match(/^https?:\/\/([\w.-]+)/) || s.match(/^\/\/([\w.-]+)/)
-            if (m && IGNORE_HOST_RE.test(m[1])) return s
-        }
+        if (isIgnoredHost(s)) return s
+        return replaceMediaUrlCore(s)
+    }
 
-        if (s.startsWith('http://') || s.startsWith('https://')) return s.replace(/^https?:\/\/.*?\//, getReplacement())
-        if (s.startsWith('//')) return s.replace(/^\/\/.*?\//, getReplacement().replace(/^https?:/, ''))
-        if (/^[^/]+\//.test(s)) return s.replace(/^[^/]+\//, `${getReplacementHost()}/`)
+    const replaceMediaHostValueCore = (s) => {
+        if (s.startsWith('http://') || s.startsWith('https://')) return getReplacementNoSlash()
+        if (s.startsWith('//')) return getReplacementNoSlash().replace(/^https?:/, '')
+        if (/^[^/]+$/.test(s)) return getReplacementHost()
         return s
+    }
+
+    const replaceMediaHostValueUnchecked = (s) => {
+        if (isIgnoredHost(s)) return s
+        return replaceMediaHostValueCore(s)
     }
 
     const replaceMediaHostValue = (s) => {
@@ -176,18 +220,8 @@
         if (!shouldApplyReplacement()) return s
         if (!hasMediaDomain(s)) return s
 
-        try {
-            const u = new URL(s.startsWith('//') ? `https:${s}` : s)
-            if (IGNORE_HOST_RE.test(u.hostname)) return s
-        } catch (_) {
-            const m = s.match(/^https?:\/\/([\w.-]+)/) || s.match(/^\/\/([\w.-]+)/)
-            if (m && IGNORE_HOST_RE.test(m[1])) return s
-        }
-
-        if (s.startsWith('http://') || s.startsWith('https://')) return getReplacementNoSlash()
-        if (s.startsWith('//')) return getReplacementNoSlash().replace(/^https?:/, '')
-        if (/^[^/]+$/.test(s)) return getReplacementHost()
-        return s
+        if (isIgnoredHost(s)) return s
+        return replaceMediaHostValueCore(s)
     }
 
     const deepReplacePlayInfo = (obj) => {
@@ -196,7 +230,7 @@
             for (let i = 0; i < obj.length; i++) {
                 const item = obj[i]
                 if (typeof item === 'string') {
-                    const out = hasMediaDomain(item) ? replaceMediaUrl(item) : item
+                    const out = hasMediaDomain(item) ? replaceMediaUrlUnchecked(item) : item
                     if (out !== item) obj[i] = out
                 } else {
                     deepReplacePlayInfo(item)
@@ -209,16 +243,16 @@
             const v = obj[k]
             if (typeof v === 'string') {
                 if (k === 'host') {
-                    if (hasMediaDomain(v)) obj[k] = replaceMediaHostValue(v)
+                    if (hasMediaDomain(v)) obj[k] = replaceMediaHostValueUnchecked(v)
                 } else {
-                    if (hasMediaDomain(v)) obj[k] = replaceMediaUrl(v)
+                    if (hasMediaDomain(v)) obj[k] = replaceMediaUrlUnchecked(v)
                 }
             } else if (Array.isArray(v) && k === 'backup_url') {
                 if (!getPowerMode()) continue
                 for (let i = 0; i < v.length; i++) {
                     const s = v[i]
                     if (typeof s === 'string') {
-                        if (hasMediaDomain(s)) v[i] = replaceMediaUrl(s)
+                        if (hasMediaDomain(s)) v[i] = replaceMediaUrlUnchecked(s)
                     }
                     else deepReplacePlayInfo(s)
                 }
@@ -229,6 +263,7 @@
     }
 
     const transformPlayUrlResponse = (playInfo) => {
+        if (!shouldApplyReplacement()) return
         if (!playInfo || typeof playInfo !== 'object') return
         if (playInfo.code !== (void 0) && playInfo.code !== 0) return
         deepReplacePlayInfo(playInfo)
@@ -288,7 +323,13 @@
         const Replacement = (cfg && typeof cfg.replacement === 'string') ? cfg.replacement : ''
         const replacementHost = (cfg && typeof cfg.replacementHost === 'string') ? cfg.replacementHost : ''
         const getHost = () => replacementHost
-        const IgnoreHostRe = /^(?:bvc|data|pbp|api|api\w+)\./
+        const IGNORE_HOST_RE = /^(?:bvc|data|pbp|api|api\w+)\./
+        const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)\//
+        function isIgnoredHost(s) {
+            const m = HOST_EXTRACT_RE.exec(s)
+            const host = m && (m[1] || m[2])
+            return !!host && IGNORE_HOST_RE.test(host.toLowerCase())
+        }
         const hasMedia = (s) => typeof s === 'string' && (
             s.indexOf('bilivideo.') !== -1
             || s.indexOf('acgvideo.') !== -1
@@ -300,13 +341,7 @@
             if (typeof s !== 'string') return s
             if (!shouldApply()) return s
             if (!hasMedia(s)) return s
-            try {
-                const u = new URL(s.startsWith('//') ? `https:${s}` : s)
-                if (IgnoreHostRe.test(u.hostname)) return s
-            } catch (_) {
-                const m = s.match(/^https?:\/\/([\w.-]+)/) || s.match(/^\/\/([\w.-]+)/)
-                if (m && IgnoreHostRe.test(m[1])) return s
-            }
+            if (isIgnoredHost(s)) return s
             if (s.startsWith('http://') || s.startsWith('https://')) return s.replace(/^https?:\/\/.*?\//, Replacement)
             if (s.startsWith('//')) return s.replace(/^\/\/.*?\//, Replacement.replace(/^https?:/, ''))
             if (/^[^/]+\//.test(s)) return s.replace(/^[^/]+\//, `${getHost()}/`)
@@ -492,7 +527,7 @@
     ]
 
     interceptNetResponse((response, url) => {
-        if (!isCcbEnabled()) return
+        if (getCcbConfig().node === defaultCdnNode) return
         const u = typeof url === 'string' ? url : (url && url.url) || String(url)
         if (!PLAYURL_PATHS.some(p => u.includes(p))) return
         if (response === null) return true
@@ -513,8 +548,9 @@
     })
 
     interceptNetResponse((response, url) => {
-        if (!isCcbEnabled()) return
-        if (!getLiveMode()) return
+        const config = getCcbConfig()
+        if (config.node === defaultCdnNode) return
+        if (!config.liveMode) return
         const raw = typeof url === 'string' ? url : (url && url.url) || ''
         let u
         try { u = new URL(raw || String(url), location.href) } catch (_) { return }
@@ -532,8 +568,9 @@
     })
 
     interceptNetResponse((response, url) => {
-        if (!isCcbEnabled()) return
-        if (!getLiveMode()) return
+        const config = getCcbConfig()
+        if (config.node === defaultCdnNode) return
+        if (!config.liveMode) return
         const u = typeof url === 'string' ? url : (url && url.url) || String(url)
         if (!u.includes('/xlive/play-gateway/master/url')) return
         if (response === null) return true
@@ -914,12 +951,14 @@
         powerBtn.addEventListener('click', () => {
             const next = !getPowerMode()
             GM_setValue(powerModeStored, next)
+            ccbConfigCache = null
             powerBtn.textContent = next ? '强力替换模式：ON' : '强力替换模式：OFF'
         })
         const liveBtn = createButton(getLiveMode() ? '适用直播和番剧：ON' : '适用直播和番剧：OFF', true, false)
         liveBtn.addEventListener('click', () => {
             const next = !getLiveMode()
             GM_setValue(liveModeStored, next)
+            ccbConfigCache = null
             liveBtn.textContent = next ? '适用直播和番剧：ON' : '适用直播和番剧：OFF'
         })
         const applyBtn = createButton('应用并刷新', false, true)
