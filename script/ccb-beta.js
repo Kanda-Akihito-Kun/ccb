@@ -411,12 +411,18 @@
 
                     const shouldIntercept = handle(null, resolvedUrl, { type: 'fetch', input, init })
                     if (!shouldIntercept) return Ofetch(input, init)
-                    return Ofetch(input, init).then(resp => new Promise((resolve) => {
-                        resp.text().then(text => {
-                            const out = handle(text, resolvedUrl, { type: 'fetch', input, init, response: resp })
-                            resolve(new (w.Response || Response)(out, { status: resp.status, statusText: resp.statusText, headers: resp.headers }))
+                    return Ofetch(input, init).then(resp => {
+                        if (!resp.body || resp.status === 204 || resp.status === 205 || resp.status === 304) return resp
+                        return resp.text().then(text => {
+                            let out = text
+                            try {
+                                out = handle(text, resolvedUrl, { type: 'fetch', input, init, response: resp })
+                            } catch (e) {
+                                logger('处理响应失败:', e)
+                            }
+                            return new (w.Response || Response)(out, { status: resp.status, statusText: resp.statusText, headers: resp.headers })
                         })
-                    }))
+                    })
                 }
 
                 try {
