@@ -77,6 +77,8 @@
     }
 
     let ccbConfigCache = null
+    let workerPreludeCache = null
+    let workerPreludeContextKey = null
 
     const getTargetCdnNode = (ctx) => {
         if (ctx === void 0) return getCcbConfig().node
@@ -96,6 +98,8 @@
             value,
         )
         ccbConfigCache = null
+        workerPreludeCache = null
+        workerPreludeContextKey = null
         return result
     }
     const setRegion = (ctx, value) => {
@@ -104,6 +108,8 @@
             value,
         )
         ccbConfigCache = null
+        workerPreludeCache = null
+        workerPreludeContextKey = null
         return result
     }
     const getPowerMode = () => getCcbConfig().powerMode
@@ -385,18 +391,25 @@
     }
 
     const buildWorkerPrelude = () => {
+        const contextKey = getContextKey()
+        if (workerPreludeCache && workerPreludeContextKey === contextKey) return workerPreludeCache
+
         const cfg = {
             forceReplace: shouldApplyReplacement(),
             replacement: getReplacement(),
             replacementHost: getReplacementHost(),
         }
         const runtime = `(${installCcbWorkerRuntime.toString()})(${JSON.stringify(cfg)});`
-        return `(() => {\n` +
+        workerPreludeContextKey = contextKey
+        workerPreludeCache = `(() => {\n` +
             `  if (self.__CCB_WORKER_PRELUDE__) return;\n` +
             `  self.__CCB_WORKER_PRELUDE__ = true;\n` +
             `  try { ${runtime} } catch (_) {}\n` +
             `})();\n`
+        return workerPreludeCache
     }
+
+    const xhrMemoUnset = {}
 
     const interceptNetResponse = (theWindow => {
         const interceptors = []
@@ -416,18 +429,28 @@
                 const OX = w.XMLHttpRequest
                 class XHR extends OX {
                     open(...args) {
+                        this._ccbIntercept = false
+                        this._ccbResponseMemo = xhrMemoUnset
+                        this._ccbResponseTextMemo = xhrMemoUnset
                         try {
                             if (typeof args[1] === 'string') args[1] = replaceMediaUrl(args[1])
                         } catch (_) {}
+                        this._ccbIntercept = !!handle(null, args[1], { type: 'xhr', xhr: this })
                         return super.open(...args)
                     }
                     get responseText() {
-                        if (this.readyState !== this.DONE) return super.responseText
-                        return handle(super.responseText, this.responseURL, { type: 'xhr', xhr: this })
+                        if (!this._ccbIntercept || this.readyState !== this.DONE) return super.responseText
+                        if (this._ccbResponseTextMemo !== xhrMemoUnset) return this._ccbResponseTextMemo
+                        const value = handle(super.responseText, this.responseURL, { type: 'xhr', xhr: this })
+                        this._ccbResponseTextMemo = value
+                        return value
                     }
                     get response() {
-                        if (this.readyState !== this.DONE) return super.response
-                        return handle(super.response, this.responseURL, { type: 'xhr', xhr: this })
+                        if (!this._ccbIntercept || this.readyState !== this.DONE) return super.response
+                        if (this._ccbResponseMemo !== xhrMemoUnset) return this._ccbResponseMemo
+                        const value = handle(super.response, this.responseURL, { type: 'xhr', xhr: this })
+                        this._ccbResponseMemo = value
+                        return value
                     }
                 }
                 w.XMLHttpRequest = XHR
@@ -444,17 +467,14 @@
                     }
 
                     const s = typeof input === 'string' ? input : (input && input.url)
-                    let resolvedUrl = s
-                    try { resolvedUrl = new URL(s, w.location && w.location.href ? w.location.href : location.href).href } catch (_) {}
-
-                    const shouldIntercept = handle(null, resolvedUrl, { type: 'fetch', input, init })
+                    const shouldIntercept = handle(null, s, { type: 'fetch', input, init })
                     if (!shouldIntercept) return Ofetch(input, init)
                     return Ofetch(input, init).then(resp => {
                         if (!resp.body || resp.status === 204 || resp.status === 205 || resp.status === 304) return resp
                         return resp.text().then(text => {
                             let out = text
                             try {
-                                out = handle(text, resolvedUrl, { type: 'fetch', input, init, response: resp })
+                                out = handle(text, s, { type: 'fetch', input, init, response: resp })
                             } catch (e) {
                                 logger('处理响应失败:', e)
                             }
@@ -468,10 +488,11 @@
                     if (w.Blob && (!bHooked || bHooked !== w.Blob)) {
                         const OBlob = w.Blob
                         w.Blob = function (parts, options) {
+                            if (!shouldInstallWorkerHooks()) return new OBlob(parts, options)
                             const type = options && options.type ? String(options.type) : ''
                             const looksJs = /javascript/i.test(type)
                                 || (Array.isArray(parts) && parts.some(p => typeof p === 'string' && /importScripts|WorkerGlobalScope|bili/i.test(p)))
-                            if (looksJs && shouldInstallWorkerHooks()) {
+                            if (looksJs) {
                                 const injected = [buildWorkerPrelude(), ...(Array.isArray(parts) ? parts : [parts])]
                                 return new OBlob(injected, options)
                             }
@@ -518,20 +539,12 @@
         return register
     })(unsafeWindow)
 
-    const PLAYURL_PATHS = [
-        '/x/player/wbi/playurl',
-        '/x/player/playurl',
-        '/pgc/player/web/playurl',
-        '/pgc/player/web/v2/playurl',
-        '/pgc/player/api/playurl',
-        '/pugv/player/web/playurl',
-        '/ogv/player/playview',
-    ]
+    const PLAYURL_PATH_RE = /(?:\/x\/player\/wbi\/playurl|\/x\/player\/playurl|\/pgc\/player\/web\/playurl|\/pgc\/player\/web\/v2\/playurl|\/pgc\/player\/api\/playurl|\/pugv\/player\/web\/playurl|\/ogv\/player\/playview)/
 
     interceptNetResponse((response, url) => {
         if (!isCcbEnabled()) return
         const u = typeof url === 'string' ? url : (url && url.url) || String(url)
-        if (!PLAYURL_PATHS.some(p => u.includes(p))) return
+        if (!PLAYURL_PATH_RE.test(u)) return
         if (response === null) return true
 
         try {
@@ -954,6 +967,8 @@
             const next = !getPowerMode()
             GM_setValue(powerModeStored, next)
             ccbConfigCache = null
+            workerPreludeCache = null
+            workerPreludeContextKey = null
             powerBtn.textContent = next ? '强力替换模式：ON' : '强力替换模式：OFF'
         })
         const liveBtn = createButton(getLiveMode() ? '适用直播和番剧：ON' : '适用直播和番剧：OFF', true, false)
@@ -961,6 +976,8 @@
             const next = !getLiveMode()
             GM_setValue(liveModeStored, next)
             ccbConfigCache = null
+            workerPreludeCache = null
+            workerPreludeContextKey = null
             liveBtn.textContent = next ? '适用直播和番剧：ON' : '适用直播和番剧：OFF'
         })
         const applyBtn = createButton('应用并刷新', false, true)
