@@ -192,22 +192,23 @@
     const ccbRewriteStats = { host: null, count: 0 }
     let statsFlushTimer = null
 
+    // malformed 表示存储里是坏值,调用方负责把重置后的空对象写回
     const readStatsStore = () => {
         let store
         try {
             store = GM_getValue(statsStored, {})
             if (typeof store === 'string') store = JSON.parse(store)
         } catch (_) {
-            return {}
+            return { store: {}, malformed: true }
         }
-        if (!store || typeof store !== 'object' || Array.isArray(store)) return {}
-        return store
+        if (!store || typeof store !== 'object' || Array.isArray(store)) return { store: {}, malformed: true }
+        return { store, malformed: false }
     }
 
     const flushRewriteStats = () => {
         statsFlushTimer = null
         try {
-            const store = readStatsStore()
+            const { store } = readStatsStore()
             store[ccbFrameId] = { host: ccbRewriteStats.host, count: ccbRewriteStats.count, ts: Date.now() }
             GM_setValue(statsStored, store)
         } catch (_) {}
@@ -224,11 +225,11 @@
 
     const readAggregateStats = () => {
         const now = Date.now()
-        const store = readStatsStore()
+        const { store, malformed } = readStatsStore()
         let count = ccbRewriteStats.count
         let freshestTs = 0
         let freshestHost = ''
-        let pruned = false
+        let pruned = malformed
         for (const key in store) {
             if (!Object.prototype.hasOwnProperty.call(store, key)) continue
             const entry = store[key]
@@ -801,10 +802,12 @@
         parent.appendChild(opt)
     }
 
-    const applySelectValue = (selectEl, values, preferred, current) => {
-        // 优先恢复已保存的选择,其次沿用当前选中项
+    // 优先恢复已保存的选择,其次沿用当前选中项,都不在列表里时显式回落,不依赖浏览器的隐式首项
+    const applySelectValue = (selectEl, values, preferred, current, fallback) => {
+        if (!values.length) return
         if (values.includes(preferred)) selectEl.value = preferred
         else if (values.includes(current)) selectEl.value = current
+        else selectEl.value = values.includes(fallback) ? fallback : values[0]
     }
 
     const renderRegionOptions = (selectEl, regions, preferred) => {
@@ -838,7 +841,12 @@
             }
             group.nodes.push(node)
         }
-        if (ungrouped.length) groups.push({ label: null, nodes: ungrouped })
+        // 未分组项含列表首项(使用默认源)时置顶,否则置尾
+        if (ungrouped.length) {
+            const bucket = { label: null, nodes: ungrouped }
+            if (ungrouped[0] === list[0]) groups.unshift(bucket)
+            else groups.push(bucket)
+        }
         return groups
     }
 
@@ -855,7 +863,7 @@
             for (const v of group.nodes) appendOption(optgroup, v)
             selectEl.appendChild(optgroup)
         }
-        applySelectValue(selectEl, nodes, preferred, current)
+        applySelectValue(selectEl, nodes, preferred, current, defaultCdnNode)
     }
 
     const getRegionList = async (onSuccess) => {
