@@ -39,6 +39,7 @@
     const liveRegionStored = 'region_live'
     const powerModeStored = 'powerMode'
     const liveModeStored = 'liveMode'
+    const dataCacheStored = 'CCB_datacache'
 
     const logger = ((...args) => {
         console.warn('[CCB]', ...args)
@@ -608,6 +609,46 @@
     let regionList = [manualRegionName]
     let cdnDataCache = null
 
+    const getStoredDataCache = () => {
+        let dataCache
+        try {
+            dataCache = GM_getValue(dataCacheStored, null)
+            if (typeof dataCache === 'string') dataCache = JSON.parse(dataCache)
+        } catch (_) {
+            return { region: null, cdn: null }
+        }
+        if (!dataCache || typeof dataCache !== 'object' || Array.isArray(dataCache)) return { region: null, cdn: null }
+        const isStoredEntry = (entry, isData) => entry
+            && typeof entry === 'object'
+            && Number.isFinite(entry.fetchedAt)
+            && isData(entry.data)
+        return {
+            region: isStoredEntry(dataCache.region, data => Array.isArray(data) && data.every(v => typeof v === 'string')) ? dataCache.region : null,
+            cdn: isStoredEntry(dataCache.cdn, data => data && typeof data === 'object' && !Array.isArray(data)) ? dataCache.cdn : null,
+        }
+    }
+
+    const getRegionOptions = (regions) => [manualRegionName, ...regions.filter(v => v && v !== manualRegionName && v !== '编辑')]
+
+    const loadDataCache = () => {
+        const dataCache = getStoredDataCache()
+        regionList = dataCache.region ? getRegionOptions(dataCache.region.data) : [manualRegionName]
+        cdnDataCache = dataCache.cdn ? dataCache.cdn.data : null
+        return dataCache
+    }
+
+    const storeRegionData = (data) => {
+        const dataCache = getStoredDataCache()
+        dataCache.region = { data, fetchedAt: Date.now() }
+        GM_setValue(dataCacheStored, dataCache)
+    }
+
+    const storeCdnData = (data) => {
+        const dataCache = getStoredDataCache()
+        dataCache.cdn = { data, fetchedAt: Date.now() }
+        GM_setValue(dataCacheStored, dataCache)
+    }
+
     const requestText = (url) => new Promise((resolve, reject) => {
         const fetchFallback = () => fetch(url).then(r => r.text()).then(resolve, reject)
         try {
@@ -631,26 +672,57 @@
 
     const requestJson = async (url) => JSON.parse(await requestText(url))
 
-    const getRegionList = async () => {
+    const renderRegionOptions = (selectEl, regions) => {
+        const value = selectEl.value
+        selectEl.textContent = ''
+        for (const region of regions) {
+            const opt = document.createElement('option')
+            opt.value = region
+            opt.textContent = region
+            selectEl.appendChild(opt)
+        }
+        if (regions.includes(value)) selectEl.value = value
+    }
+
+    const renderNodeOptions = (selectEl, nodes) => {
+        const value = selectEl.value
+        selectEl.textContent = ''
+        for (const node of nodes) {
+            const opt = document.createElement('option')
+            opt.value = node
+            opt.textContent = node
+            selectEl.appendChild(opt)
+        }
+        if (nodes.includes(value)) selectEl.value = value
+    }
+
+    const getRegionList = async (onSuccess) => {
         try {
             const data = await requestJson(`${api}/region.json`)
-            if (Array.isArray(data)) regionList = [manualRegionName, ...data.filter(v => v && v !== manualRegionName && v !== '编辑')]
+            if (!Array.isArray(data)) return
+            const regions = data.filter(v => typeof v === 'string')
+            regionList = getRegionOptions(regions)
+            storeRegionData(regions)
+            if (onSuccess) onSuccess()
         } catch (_) {}
     }
 
-    const getCdnData = async () => {
-        if (cdnDataCache) return cdnDataCache
+    const getCdnData = async (onSuccess) => {
         try {
-            cdnDataCache = await requestJson(`${api}/cdn.json`)
+            const data = await requestJson(`${api}/cdn.json`)
+            if (!data || typeof data !== 'object' || Array.isArray(data)) throw new TypeError('无效 CDN 数据')
+            cdnDataCache = data
+            storeCdnData(data)
+            if (onSuccess) onSuccess()
         } catch (_) {
-            cdnDataCache = {}
+            if (!cdnDataCache) cdnDataCache = {}
         }
         return cdnDataCache
     }
 
-    const getCdnListByRegion = async (region) => {
+    const getCdnListByRegion = (region) => {
         if (region === manualRegionName || region === '编辑') return [defaultCdnNode]
-        const data = await getCdnData()
+        const data = cdnDataCache || {}
         const regionData = (data && data[region]) || []
         return [defaultCdnNode, ...regionData]
     }
@@ -662,9 +734,23 @@
             return
         }
 
-        await getRegionList()
+        const dataCache = loadDataCache()
+        let root = null
+        const panelControls = []
+        const isPanelOpen = () => root && root.isConnected
+        const rerenderRegions = () => {
+            if (!isPanelOpen()) return
+            for (const controls of panelControls) controls.renderRegions()
+        }
+        const rerenderNodes = () => {
+            if (!isPanelOpen()) return
+            for (const controls of panelControls) controls.renderNodes()
+        }
+        const regionRequest = getRegionList(rerenderRegions)
+        const cdnRequest = getCdnData(rerenderNodes)
+        if (!dataCache.region && !dataCache.cdn) await Promise.all([regionRequest, cdnRequest])
 
-        const root = document.createElement('div')
+        root = document.createElement('div')
         root.id = 'ccb-settings-panel'
         root.style.cssText = [
             'position:fixed',
@@ -722,15 +808,10 @@
             return box
         }
 
-        const mkSelect = (options, value) => {
+        const mkSelect = (options, value, renderOptions) => {
             const sel = document.createElement('select')
             sel.style.cssText = 'flex:1;background:#111;color:#fff;border:1px solid #333;border-radius:8px;padding:8px'
-            for (const v of options) {
-                const opt = document.createElement('option')
-                opt.value = v
-                opt.textContent = v
-                sel.appendChild(opt)
-            }
+            renderOptions(sel, options)
             sel.value = value
             return sel
         }
@@ -744,12 +825,14 @@
             return inp
         }
 
-        const mountRegionAndNode = async (ctx, hostBox) => {
+        const mountRegionAndNode = (ctx, hostBox) => {
             const region = getRegion(ctx)
             let nodeValue = getTargetCdnNode(ctx)
+            let nodeSelect = null
+            let nodeInput = null
 
             const { row: regionRow } = mkRow('地区')
-            const regionSelect = mkSelect(regionList, region)
+            const regionSelect = mkSelect(regionList, region, renderRegionOptions)
             regionRow.appendChild(regionSelect)
             hostBox.appendChild(regionRow)
 
@@ -757,14 +840,18 @@
             hostBox.appendChild(nodeRow)
 
             const clearRowControl = () => {
+                if (nodeSelect) nodeValue = nodeSelect.value
                 while (nodeRow.childNodes.length > 1) nodeRow.removeChild(nodeRow.lastChild)
+                nodeSelect = null
+                nodeInput = null
             }
 
-            const renderNodeControl = async (regionValue) => {
-                clearRowControl()
-
+            const renderNodeControl = (regionValue) => {
                 if (regionValue === manualRegionName) {
+                    if (nodeInput) return
+                    clearRowControl()
                     const inp = mkInput(nodeValue === defaultCdnNode ? '' : nodeValue)
+                    nodeInput = inp
                     nodeRow.appendChild(inp)
                     inp.addEventListener('input', () => {
                         const v = inp.value.trim()
@@ -774,10 +861,16 @@
                     return
                 }
 
-                const list = await getCdnListByRegion(regionValue)
-                if (!list.includes(nodeValue)) nodeValue = defaultCdnNode
-                setTargetCdnNode(ctx, nodeValue)
-                const sel = mkSelect(list, nodeValue)
+                const list = getCdnListByRegion(regionValue)
+                if (nodeSelect) {
+                    renderNodeOptions(nodeSelect, list)
+                    nodeValue = nodeSelect.value
+                    return
+                }
+                clearRowControl()
+                const sel = mkSelect(list, list.includes(nodeValue) ? nodeValue : defaultCdnNode, renderNodeOptions)
+                nodeSelect = sel
+                nodeValue = sel.value
                 nodeRow.appendChild(sel)
                 sel.addEventListener('change', () => {
                     nodeValue = sel.value
@@ -785,28 +878,35 @@
                 })
             }
 
-            await renderNodeControl(regionSelect.value)
-            regionSelect.addEventListener('change', async () => {
+            renderNodeControl(regionSelect.value)
+            regionSelect.addEventListener('change', () => {
                 const next = regionSelect.value
                 setRegion(ctx, next)
-                await renderNodeControl(next)
+                renderNodeControl(next)
+            })
+            panelControls.push({
+                renderRegions: () => {
+                    renderRegionOptions(regionSelect, regionList)
+                    renderNodeControl(regionSelect.value)
+                },
+                renderNodes: () => { renderNodeControl(regionSelect.value) },
             })
         }
 
         const mainBox = mkSectionBox()
         mainBox.appendChild(mkSectionTitle('视频 | 课堂 | 番剧(需特殊设置)'))
         body.appendChild(mainBox)
-        await mountRegionAndNode('main', mainBox)
+        mountRegionAndNode('main', mainBox)
 
         const liveBox = mkSectionBox()
         liveBox.appendChild(mkSectionTitle('直播'))
         body.appendChild(liveBox)
-        await mountRegionAndNode('live', liveBox)
+        mountRegionAndNode('live', liveBox)
 
         const diagnosticsBox = mkSectionBox()
         diagnosticsBox.appendChild(mkSectionTitle('测速'))
         body.appendChild(diagnosticsBox)
-        await mountRegionAndNode('diagnostics', diagnosticsBox)
+        mountRegionAndNode('diagnostics', diagnosticsBox)
 
         const actions = document.createElement('div')
         actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px'
