@@ -794,23 +794,69 @@
 
     const requestJson = async (url) => JSON.parse(await requestText(url))
 
-    const renderSelectOptions = (selectEl, values, preferred) => {
-        const current = selectEl.value
-        selectEl.textContent = ''
-        for (const v of values) {
-            const opt = document.createElement('option')
-            opt.value = v
-            opt.textContent = v
-            selectEl.appendChild(opt)
-        }
+    const appendOption = (parent, value) => {
+        const opt = document.createElement('option')
+        opt.value = value
+        opt.textContent = value
+        parent.appendChild(opt)
+    }
+
+    const applySelectValue = (selectEl, values, preferred, current) => {
         // 优先恢复已保存的选择,其次沿用当前选中项
         if (values.includes(preferred)) selectEl.value = preferred
         else if (values.includes(current)) selectEl.value = current
     }
 
-    const renderRegionOptions = (selectEl, regions, preferred) => renderSelectOptions(selectEl, regions, preferred)
+    const renderRegionOptions = (selectEl, regions, preferred) => {
+        const current = selectEl.value
+        selectEl.textContent = ''
+        for (const v of regions) appendOption(selectEl, v)
+        applySelectValue(selectEl, regions, preferred, current)
+    }
 
-    const renderNodeOptions = (selectEl, nodes, preferred) => renderSelectOptions(selectEl, nodes, preferred)
+    const CDN_NODE_RE = /^cn-([a-z0-9]+)-([a-z0-9]+)-/
+    // 只有这三个是运营商缩写,其余 token 原样展示
+    const ispLabelMap = { cm: '移动', ct: '电信', cu: '联通' }
+
+    // 仅用于下拉框展示分组,不改变节点列表本身
+    const groupCdnNodes = (list) => {
+        const groups = []
+        const byLabel = new Map()
+        const ungrouped = []
+        for (const node of list) {
+            const m = typeof node === 'string' ? CDN_NODE_RE.exec(node) : null
+            if (!m) {
+                ungrouped.push(node)
+                continue
+            }
+            const label = `${m[1]} · ${ispLabelMap[m[2]] || m[2]}`
+            let group = byLabel.get(label)
+            if (!group) {
+                group = { label, nodes: [] }
+                byLabel.set(label, group)
+                groups.push(group)
+            }
+            group.nodes.push(node)
+        }
+        if (ungrouped.length) groups.push({ label: null, nodes: ungrouped })
+        return groups
+    }
+
+    const renderNodeOptions = (selectEl, nodes, preferred) => {
+        const current = selectEl.value
+        selectEl.textContent = ''
+        for (const group of groupCdnNodes(nodes)) {
+            if (!group.label) {
+                for (const v of group.nodes) appendOption(selectEl, v)
+                continue
+            }
+            const optgroup = document.createElement('optgroup')
+            optgroup.label = group.label
+            for (const v of group.nodes) appendOption(optgroup, v)
+            selectEl.appendChild(optgroup)
+        }
+        applySelectValue(selectEl, nodes, preferred, current)
+    }
 
     const getRegionList = async (onSuccess) => {
         try {
