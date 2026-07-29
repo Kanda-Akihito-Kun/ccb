@@ -3,7 +3,7 @@
 // @description  Custom CDN of Bilibili (CCB) Beta 版本
 // @namespace    CCB
 // @license      MIT
-// @version      2.0.3
+// @version      2.1.0
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
 // @match        https://www.bilibili.com/video/*
