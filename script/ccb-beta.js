@@ -113,7 +113,9 @@
         const contextKey = getContextKey()
         if (ccbConfigCache && ccbConfigCache.contextKey === contextKey) return ccbConfigCache
 
-        const node = getTargetCdnNode(contextKey)
+        const storedNode = getTargetCdnNode(contextKey)
+        // 存储被写坏时退回默认源，避免后续字符串操作抛错
+        const node = typeof storedNode === 'string' ? storedNode : defaultCdnNode
         const region = getRegion(contextKey)
         const powerMode = GM_getValue(powerModeStored, true)
         const liveMode = GM_getValue(liveModeStored, false)
@@ -175,7 +177,7 @@
     const getReplacementHost = () => getCcbConfig().replacementHost
 
     const IGNORE_HOST_RE = /^(?:bvc|data|pbp|api|api\w+)\./
-    const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)\//
+    const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)\//i
     function isIgnoredHost(s) {
         const m = HOST_EXTRACT_RE.exec(s)
         const host = m && (m[1] || m[2])
@@ -324,7 +326,7 @@
         const replacementHost = (cfg && typeof cfg.replacementHost === 'string') ? cfg.replacementHost : ''
         const getHost = () => replacementHost
         const IGNORE_HOST_RE = /^(?:bvc|data|pbp|api|api\w+)\./
-        const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)\//
+        const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)\//i
         function isIgnoredHost(s) {
             const m = HOST_EXTRACT_RE.exec(s)
             const host = m && (m[1] || m[2])
@@ -527,7 +529,7 @@
     ]
 
     interceptNetResponse((response, url) => {
-        if (getCcbConfig().node === defaultCdnNode) return
+        if (!isCcbEnabled()) return
         const u = typeof url === 'string' ? url : (url && url.url) || String(url)
         if (!PLAYURL_PATHS.some(p => u.includes(p))) return
         if (response === null) return true
@@ -548,8 +550,8 @@
     })
 
     interceptNetResponse((response, url) => {
+        if (!isCcbEnabled()) return
         const config = getCcbConfig()
-        if (config.node === defaultCdnNode) return
         if (!config.liveMode) return
         const raw = typeof url === 'string' ? url : (url && url.url) || ''
         let u
@@ -568,8 +570,8 @@
     })
 
     interceptNetResponse((response, url) => {
+        if (!isCcbEnabled()) return
         const config = getCcbConfig()
-        if (config.node === defaultCdnNode) return
         if (!config.liveMode) return
         const u = typeof url === 'string' ? url : (url && url.url) || String(url)
         if (!u.includes('/xlive/play-gateway/master/url')) return
