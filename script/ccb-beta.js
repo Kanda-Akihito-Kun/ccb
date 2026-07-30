@@ -82,6 +82,17 @@
     let workerPreludeCache = null
     let workerPreludeContextKey = null
 
+    const invalidateCcbCaches = () => {
+        ccbConfigCache = null
+        workerPreludeCache = null
+        workerPreludeContextKey = null
+    }
+    // 别的标签页改设置不会通知本文档,切回本页或前进后退时丢弃缓存,下次取值重新读存储
+    try {
+        document.addEventListener('visibilitychange', invalidateCcbCaches)
+        window.addEventListener('pageshow', invalidateCcbCaches)
+    } catch (_) {}
+
     const getTargetCdnNode = (ctx) => {
         if (ctx === void 0) return getCcbConfig().node
         const stored = ctx === 'live' ? liveCdnNodeStored : (ctx === 'diagnostics' ? diagnosticsCdnNodeStored : mainCdnNodeStored)
@@ -99,9 +110,7 @@
             ctx === 'live' ? liveCdnNodeStored : (ctx === 'diagnostics' ? diagnosticsCdnNodeStored : mainCdnNodeStored),
             value,
         )
-        ccbConfigCache = null
-        workerPreludeCache = null
-        workerPreludeContextKey = null
+        invalidateCcbCaches()
         return result
     }
     const setRegion = (ctx, value) => {
@@ -109,9 +118,7 @@
             ctx === 'live' ? liveRegionStored : (ctx === 'diagnostics' ? diagnosticsRegionStored : mainRegionStored),
             value,
         )
-        ccbConfigCache = null
-        workerPreludeCache = null
-        workerPreludeContextKey = null
+        invalidateCcbCaches()
         return result
     }
     const getPowerMode = () => getCcbConfig().powerMode
@@ -205,11 +212,29 @@
         return { store, malformed: false }
     }
 
+    // 删掉坏值、过期以及时间戳来自未来的条目,返回是否改动过 store
+    const pruneStatsStore = (store, now) => {
+        let pruned = false
+        for (const key in store) {
+            if (!Object.prototype.hasOwnProperty.call(store, key)) continue
+            const entry = store[key]
+            const ts = entry && typeof entry === 'object' ? entry.ts : NaN
+            if (!Number.isFinite(ts) || now - ts > statsFreshMs || now - ts < 0) {
+                delete store[key]
+                pruned = true
+            }
+        }
+        return pruned
+    }
+
     const flushRewriteStats = () => {
         statsFlushTimer = null
         try {
+            const now = Date.now()
             const { store } = readStatsStore()
-            store[ccbFrameId] = { host: ccbRewriteStats.host, count: ccbRewriteStats.count, ts: Date.now() }
+            // 每次回写都顺手清理,否则关掉的框架会一直留在存储里
+            pruneStatsStore(store, now)
+            store[ccbFrameId] = { host: ccbRewriteStats.host, count: ccbRewriteStats.count, ts: now }
             GM_setValue(statsStored, store)
         } catch (_) {}
     }
@@ -226,22 +251,16 @@
     const readAggregateStats = () => {
         const now = Date.now()
         const { store, malformed } = readStatsStore()
+        const pruned = pruneStatsStore(store, now) || malformed
         let count = ccbRewriteStats.count
         let freshestTs = 0
         let freshestHost = ''
-        let pruned = malformed
         for (const key in store) {
             if (!Object.prototype.hasOwnProperty.call(store, key)) continue
             const entry = store[key]
-            const ts = entry && typeof entry === 'object' ? entry.ts : NaN
-            if (!Number.isFinite(ts) || now - ts > statsFreshMs) {
-                delete store[key]
-                pruned = true
-                continue
-            }
             if (Number.isFinite(entry.count)) count += entry.count
-            if (ts >= freshestTs && typeof entry.host === 'string' && entry.host) {
-                freshestTs = ts
+            if (entry.ts >= freshestTs && typeof entry.host === 'string' && entry.host) {
+                freshestTs = entry.ts
                 freshestHost = entry.host
             }
         }
@@ -505,8 +524,8 @@
                         this._ccbResponseTextMemo = xhrMemoUnset
                         try {
                             if (typeof args[1] === 'string') args[1] = replaceMediaUrl(args[1])
+                            this._ccbIntercept = !!handle(null, args[1], { type: 'xhr', xhr: this })
                         } catch (_) {}
-                        this._ccbIntercept = !!handle(null, args[1], { type: 'xhr', xhr: this })
                         return super.open(...args)
                     }
                     get responseText() {
@@ -541,7 +560,8 @@
                     const shouldIntercept = handle(null, s, { type: 'fetch', input, init })
                     if (!shouldIntercept) return Ofetch(input, init)
                     return Ofetch(input, init).then(resp => {
-                        if (!resp.body || resp.status === 204 || resp.status === 205 || resp.status === 304) return resp
+                        // 老引擎没有 Response.body 属性,不能把"属性缺失"当成"空响应体"
+                        if (('body' in resp && !resp.body) || resp.status === 204 || resp.status === 205 || resp.status === 304) return resp
                         return resp.text().then(text => {
                             let out = text
                             try {
@@ -1117,18 +1137,14 @@
         powerBtn.addEventListener('click', () => {
             const next = !getPowerMode()
             GM_setValue(powerModeStored, next)
-            ccbConfigCache = null
-            workerPreludeCache = null
-            workerPreludeContextKey = null
+            invalidateCcbCaches()
             powerBtn.textContent = next ? '强力替换模式：ON' : '强力替换模式：OFF'
         })
         const liveBtn = createButton(getLiveMode() ? '适用直播和番剧：ON' : '适用直播和番剧：OFF', true, false)
         liveBtn.addEventListener('click', () => {
             const next = !getLiveMode()
             GM_setValue(liveModeStored, next)
-            ccbConfigCache = null
-            workerPreludeCache = null
-            workerPreludeContextKey = null
+            invalidateCcbCaches()
             liveBtn.textContent = next ? '适用直播和番剧：ON' : '适用直播和番剧：OFF'
         })
         const applyBtn = createButton('应用并刷新', false, true)
