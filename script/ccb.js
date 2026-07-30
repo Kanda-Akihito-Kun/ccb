@@ -271,7 +271,7 @@
     }
 
     const IGNORE_HOST_RE = /^(?:bvc|data|pbp|api|api\w+)\./
-    const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)\//i
+    const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)(?:\/|$)/i
     function isIgnoredHost(s) {
         const m = HOST_EXTRACT_RE.exec(s)
         const host = m && (m[1] || m[2])
@@ -422,7 +422,7 @@
         const replacementHost = (cfg && typeof cfg.replacementHost === 'string') ? cfg.replacementHost : ''
         const getHost = () => replacementHost
         const IGNORE_HOST_RE = /^(?:bvc|data|pbp|api|api\w+)\./
-        const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)\//i
+        const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)(?:\/|$)/i
         function isIgnoredHost(s) {
             const m = HOST_EXTRACT_RE.exec(s)
             const host = m && (m[1] || m[2])
