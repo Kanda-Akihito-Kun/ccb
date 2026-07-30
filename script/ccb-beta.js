@@ -39,7 +39,9 @@
     const liveRegionStored = 'region_live'
     const powerModeStored = 'powerMode'
     const liveModeStored = 'liveMode'
-    const dataCacheStored = 'CCB_datacache'
+    // 两份缓存分开存,避免多标签页同时写同一个键时互相覆盖
+    const regionCacheStored = 'CCB_datacache_region'
+    const cdnCacheStored = 'CCB_datacache_cdn'
     // 多标签页共用同一份统计,靠 frameId 分键和 60 秒新鲜度窗口限制串扰
     const statsStored = 'CCB_stats'
 
@@ -769,24 +771,26 @@
         && !Array.isArray(data)
         && Object.values(data).every(Array.isArray)
 
-    const getStoredDataCache = () => {
-        let dataCache
+    const readStoredEntry = (key, isData) => {
+        let entry
         try {
-            dataCache = GM_getValue(dataCacheStored, null)
-            if (typeof dataCache === 'string') dataCache = JSON.parse(dataCache)
+            entry = GM_getValue(key, null)
+            if (typeof entry === 'string') entry = JSON.parse(entry)
         } catch (_) {
-            return { region: null, cdn: null }
+            return null
         }
-        if (!dataCache || typeof dataCache !== 'object' || Array.isArray(dataCache)) return { region: null, cdn: null }
-        const isStoredEntry = (entry, isData) => entry
+        const ok = entry
             && typeof entry === 'object'
+            && !Array.isArray(entry)
             && Number.isFinite(entry.fetchedAt)
             && isData(entry.data)
-        return {
-            region: isStoredEntry(dataCache.region, data => Array.isArray(data) && data.every(v => typeof v === 'string')) ? dataCache.region : null,
-            cdn: isStoredEntry(dataCache.cdn, isCdnData) ? dataCache.cdn : null,
-        }
+        return ok ? entry : null
     }
+
+    const getStoredDataCache = () => ({
+        region: readStoredEntry(regionCacheStored, data => Array.isArray(data) && data.every(v => typeof v === 'string')),
+        cdn: readStoredEntry(cdnCacheStored, isCdnData),
+    })
 
     const getRegionOptions = (regions) => [manualRegionName, ...regions.filter(v => v && v !== manualRegionName && v !== '编辑')]
 
@@ -798,15 +802,11 @@
     }
 
     const storeRegionData = (data) => {
-        const dataCache = getStoredDataCache()
-        dataCache.region = { data, fetchedAt: Date.now() }
-        GM_setValue(dataCacheStored, dataCache)
+        GM_setValue(regionCacheStored, { data, fetchedAt: Date.now() })
     }
 
     const storeCdnData = (data) => {
-        const dataCache = getStoredDataCache()
-        dataCache.cdn = { data, fetchedAt: Date.now() }
-        GM_setValue(dataCacheStored, dataCache)
+        GM_setValue(cdnCacheStored, { data, fetchedAt: Date.now() })
     }
 
     const requestText = (url) => new Promise((resolve, reject) => {
