@@ -732,6 +732,12 @@
     let regionList = [manualRegionName]
     let cdnDataCache = null
 
+    // CDN 数据必须是 { 地区: 节点数组 },任一地区值不是数组就整体作废
+    const isCdnData = (data) => !!data
+        && typeof data === 'object'
+        && !Array.isArray(data)
+        && Object.values(data).every(Array.isArray)
+
     const getStoredDataCache = () => {
         let dataCache
         try {
@@ -747,7 +753,7 @@
             && isData(entry.data)
         return {
             region: isStoredEntry(dataCache.region, data => Array.isArray(data) && data.every(v => typeof v === 'string')) ? dataCache.region : null,
-            cdn: isStoredEntry(dataCache.cdn, data => data && typeof data === 'object' && !Array.isArray(data)) ? dataCache.cdn : null,
+            cdn: isStoredEntry(dataCache.cdn, isCdnData) ? dataCache.cdn : null,
         }
     }
 
@@ -866,33 +872,38 @@
         applySelectValue(selectEl, nodes, preferred, current, defaultCdnNode)
     }
 
+    // onSuccess 放在 try 外,避免重绘异常被当成请求失败吞掉
     const getRegionList = async (onSuccess) => {
+        let ok = false
         try {
             const data = await requestJson(`${api}/region.json`)
             if (!Array.isArray(data)) return
             const regions = data.filter(v => typeof v === 'string')
             regionList = getRegionOptions(regions)
             storeRegionData(regions)
-            if (onSuccess) onSuccess()
+            ok = true
         } catch (_) {}
+        if (ok && onSuccess) onSuccess()
     }
 
     const getCdnData = async (onSuccess) => {
+        let ok = false
         try {
             const data = await requestJson(`${api}/cdn.json`)
-            if (!data || typeof data !== 'object' || Array.isArray(data)) throw new TypeError('无效 CDN 数据')
+            if (!isCdnData(data)) throw new TypeError('无效 CDN 数据')
             cdnDataCache = data
             storeCdnData(data)
-            if (onSuccess) onSuccess()
+            ok = true
         } catch (_) {
             if (!cdnDataCache) cdnDataCache = {}
         }
+        if (ok && onSuccess) onSuccess()
     }
 
     const getCdnListByRegion = (region) => {
         if (region === manualRegionName || region === '编辑') return [defaultCdnNode]
         const data = cdnDataCache || {}
-        const regionData = (data && data[region]) || []
+        const regionData = Array.isArray(data[region]) ? data[region].filter(v => typeof v === 'string') : []
         return [defaultCdnNode, ...regionData]
     }
 
@@ -1019,12 +1030,18 @@
                 nodeInput = null
             }
 
+            // 已保存的节点不在列表里时补进选项,保证显示与存储一致(不写入存储)
+            const withStoredNode = (list, stored) => (stored && typeof stored === 'string' && !list.includes(stored))
+                ? [...list, stored]
+                : list
+
             // persist 仅在用户操作时为 true,后台刷新重绘不写入存储
             const renderNodeControl = (regionValue, persist) => {
+                const stored = getTargetCdnNode(ctx)
                 if (regionValue === manualRegionName) {
                     if (nodeInput) return
                     clearRowControl()
-                    const inp = mkInput(nodeValue === defaultCdnNode ? '' : nodeValue)
+                    const inp = mkInput(stored === defaultCdnNode ? '' : stored)
                     nodeInput = inp
                     nodeRow.appendChild(inp)
                     inp.addEventListener('input', () => {
@@ -1036,14 +1053,16 @@
                 }
 
                 const list = getCdnListByRegion(regionValue)
+                // 用户切换地区时按列表回落并写入,其余场景只如实展示已保存的节点
+                const options = persist ? list : withStoredNode(list, stored)
                 if (nodeSelect) {
-                    renderNodeOptions(nodeSelect, list, getTargetCdnNode(ctx))
+                    renderNodeOptions(nodeSelect, options, stored)
                     nodeValue = nodeSelect.value
                     if (persist) setTargetCdnNode(ctx, nodeValue)
                     return
                 }
                 clearRowControl()
-                const sel = mkSelect(list, list.includes(nodeValue) ? nodeValue : defaultCdnNode, renderNodeOptions)
+                const sel = mkSelect(options, options.includes(stored) ? stored : defaultCdnNode, renderNodeOptions)
                 nodeSelect = sel
                 nodeValue = sel.value
                 nodeRow.appendChild(sel)
