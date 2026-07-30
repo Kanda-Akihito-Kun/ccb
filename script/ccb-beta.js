@@ -572,7 +572,15 @@
                             } catch (e) {
                                 logger('处理响应失败:', e)
                             }
-                            return new (w.Response || Response)(out, { status: resp.status, statusText: resp.statusText, headers: resp.headers })
+                            // 重建响应会让原来的 content-length 失真,url/redirected 也会丢失,尽量补回
+                            let headers = resp.headers
+                            try { headers = new (w.Headers || Headers)(resp.headers); headers.delete('content-length') } catch (_) {}
+                            const next = new (w.Response || Response)(out, { status: resp.status, statusText: resp.statusText, headers })
+                            try {
+                                Object.defineProperty(next, 'url', { value: resp.url, configurable: true })
+                                Object.defineProperty(next, 'redirected', { value: resp.redirected, configurable: true })
+                            } catch (_) {}
+                            return next
                         })
                     })
                 }
