@@ -1015,8 +1015,7 @@
         const mkSelect = (options, value, renderOptions) => {
             const sel = document.createElement('select')
             sel.style.cssText = 'flex:1;background:#111;color:#fff;border:1px solid #333;border-radius:8px;padding:8px'
-            renderOptions(sel, options)
-            sel.value = value
+            renderOptions(sel, options, value)
             return sel
         }
 
