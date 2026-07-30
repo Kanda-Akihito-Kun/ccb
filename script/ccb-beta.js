@@ -950,25 +950,25 @@
         if (panelOpening) return
         panelOpening = true
 
-        const dataCache = loadDataCache()
         let root = null
         const panelControls = []
-        const isPanelOpen = () => root && root.isConnected
-        const rerenderRegions = () => {
-            if (!isPanelOpen()) return
-            for (const controls of panelControls) controls.renderRegions()
-        }
-        const rerenderNodes = () => {
-            if (!isPanelOpen()) return
-            for (const controls of panelControls) controls.renderNodes()
-        }
-        const regionRequest = getRegionList(rerenderRegions)
-        const cdnRequest = getCdnData(rerenderNodes)
-        // 只等待本地没有存档的资源,已有存档的先渲染再后台刷新
-        const pending = []
-        if (!dataCache.region) pending.push(regionRequest)
-        if (!dataCache.cdn) pending.push(cdnRequest)
         try {
+            const dataCache = loadDataCache()
+            const isPanelOpen = () => root && root.isConnected
+            const rerenderRegions = () => {
+                if (!isPanelOpen()) return
+                for (const controls of panelControls) controls.renderRegions()
+            }
+            const rerenderNodes = () => {
+                if (!isPanelOpen()) return
+                for (const controls of panelControls) controls.renderNodes()
+            }
+            const regionRequest = getRegionList(rerenderRegions)
+            const cdnRequest = getCdnData(rerenderNodes)
+            // 只等待本地没有存档的资源,已有存档的先渲染再后台刷新
+            const pending = []
+            if (!dataCache.region) pending.push(regionRequest)
+            if (!dataCache.cdn) pending.push(cdnRequest)
             if (pending.length) await Promise.all(pending)
         } finally {
             panelOpening = false
