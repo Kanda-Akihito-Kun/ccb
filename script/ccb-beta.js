@@ -940,6 +940,8 @@
 
     // 首次打开需要等待网络,期间再次触发菜单会重复插入面板,用标记挡住并发调用
     let panelOpening = false
+    // 请求可能一直不回调,等待设上限,超时后先渲染,迟到的响应仍由后台重绘补上
+    const panelDataWaitMs = 8000
 
     const openPanel = async () => {
         const existing = document.querySelector('#ccb-settings-panel')
@@ -969,7 +971,10 @@
             const pending = []
             if (!dataCache.region) pending.push(regionRequest)
             if (!dataCache.cdn) pending.push(cdnRequest)
-            if (pending.length) await Promise.all(pending)
+            if (pending.length) await Promise.race([
+                Promise.all(pending),
+                new Promise(resolve => setTimeout(resolve, panelDataWaitMs)),
+            ])
         } finally {
             panelOpening = false
         }
