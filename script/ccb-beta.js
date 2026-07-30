@@ -537,6 +537,9 @@
                     }
                     get response() {
                         if (!this._ccbIntercept || this.readyState !== this.DONE) return super.response
+                        // responseType 为 '' 或 'text' 时 response 就是 responseText,复用同一份缓存避免重复处理
+                        const rt = this.responseType
+                        if (rt === '' || rt === 'text') return this.responseText
                         if (this._ccbResponseMemo !== xhrMemoUnset) return this._ccbResponseMemo
                         const value = handle(super.response, this.responseURL, { type: 'xhr', xhr: this })
                         this._ccbResponseMemo = value
