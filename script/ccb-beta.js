@@ -930,12 +930,17 @@
         return [defaultCdnNode, ...regionData]
     }
 
+    // 首次打开需要等待网络,期间再次触发菜单会重复插入面板,用标记挡住并发调用
+    let panelOpening = false
+
     const openPanel = async () => {
         const existing = document.querySelector('#ccb-settings-panel')
         if (existing) {
             existing.remove()
             return
         }
+        if (panelOpening) return
+        panelOpening = true
 
         const dataCache = loadDataCache()
         let root = null
@@ -955,7 +960,11 @@
         const pending = []
         if (!dataCache.region) pending.push(regionRequest)
         if (!dataCache.cdn) pending.push(cdnRequest)
-        if (pending.length) await Promise.all(pending)
+        try {
+            if (pending.length) await Promise.all(pending)
+        } finally {
+            panelOpening = false
+        }
 
         root = document.createElement('div')
         root.id = 'ccb-settings-panel'
