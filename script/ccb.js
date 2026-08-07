@@ -3,7 +3,7 @@
 // @description  Custom CDN of Bilibili (CCB)
 // @namespace    CCB
 // @license      MIT
-// @version      2.0.3
+// @version      2.1.0
 // @author       鼠鼠今天吃嘉然
 // @run-at       document-start
 // @match        https://www.bilibili.com/video/*
@@ -39,6 +39,11 @@
     const liveRegionStored = 'region_live'
     const powerModeStored = 'powerMode'
     const liveModeStored = 'liveMode'
+    // 两份缓存分开存,避免多标签页同时写同一个键时互相覆盖
+    const regionCacheStored = 'CCB_datacache_region'
+    const cdnCacheStored = 'CCB_datacache_cdn'
+    // 多标签页共用同一份统计,靠 frameId 分键和 60 秒新鲜度窗口限制串扰
+    const statsStored = 'CCB_stats'
 
     const logger = ((...args) => {
         console.warn('[CCB]', ...args)
@@ -75,25 +80,77 @@
         return 'main'
     }
 
-    const getTargetCdnNode = (ctx = getContextKey()) => GM_getValue(
-        ctx === 'live' ? liveCdnNodeStored : (ctx === 'diagnostics' ? diagnosticsCdnNodeStored : mainCdnNodeStored),
-        GM_getValue(oldCdnNodeStored, defaultCdnNode),
-    )
-    const getRegion = (ctx = getContextKey()) => normalizeRegion(GM_getValue(
-        ctx === 'live' ? liveRegionStored : (ctx === 'diagnostics' ? diagnosticsRegionStored : mainRegionStored),
-        normalizeRegion(GM_getValue(oldRegionStored, manualRegionName)),
-    ))
-    const setTargetCdnNode = (ctx, value) => GM_setValue(
-        ctx === 'live' ? liveCdnNodeStored : (ctx === 'diagnostics' ? diagnosticsCdnNodeStored : mainCdnNodeStored),
-        value,
-    )
-    const setRegion = (ctx, value) => GM_setValue(
-        ctx === 'live' ? liveRegionStored : (ctx === 'diagnostics' ? diagnosticsRegionStored : mainRegionStored),
-        value,
-    )
-    const getPowerMode = () => GM_getValue(powerModeStored, true)
-    const getLiveMode = () => GM_getValue(liveModeStored, false)
-    const isCcbEnabled = () => getTargetCdnNode() !== defaultCdnNode
+    let ccbConfigCache = null
+    let workerPreludeCache = null
+    let workerPreludeContextKey = null
+
+    const invalidateCcbCaches = () => {
+        ccbConfigCache = null
+        workerPreludeCache = null
+        workerPreludeContextKey = null
+    }
+    // 别的标签页改设置不会通知本文档,切回本页或前进后退时丢弃缓存,下次取值重新读存储
+    try {
+        document.addEventListener('visibilitychange', invalidateCcbCaches)
+        window.addEventListener('pageshow', invalidateCcbCaches)
+    } catch (_) {}
+
+    const getTargetCdnNode = (ctx) => {
+        if (ctx === void 0) return getCcbConfig().node
+        const stored = ctx === 'live' ? liveCdnNodeStored : (ctx === 'diagnostics' ? diagnosticsCdnNodeStored : mainCdnNodeStored)
+        const value = GM_getValue(stored, UNSET)
+        return value === UNSET ? GM_getValue(oldCdnNodeStored, defaultCdnNode) : value
+    }
+    const getRegion = (ctx) => {
+        if (ctx === void 0) return getCcbConfig().region
+        const stored = ctx === 'live' ? liveRegionStored : (ctx === 'diagnostics' ? diagnosticsRegionStored : mainRegionStored)
+        const value = GM_getValue(stored, UNSET)
+        return normalizeRegion(value === UNSET ? GM_getValue(oldRegionStored, manualRegionName) : value)
+    }
+    const setTargetCdnNode = (ctx, value) => {
+        const result = GM_setValue(
+            ctx === 'live' ? liveCdnNodeStored : (ctx === 'diagnostics' ? diagnosticsCdnNodeStored : mainCdnNodeStored),
+            value,
+        )
+        invalidateCcbCaches()
+        return result
+    }
+    const setRegion = (ctx, value) => {
+        const result = GM_setValue(
+            ctx === 'live' ? liveRegionStored : (ctx === 'diagnostics' ? diagnosticsRegionStored : mainRegionStored),
+            value,
+        )
+        invalidateCcbCaches()
+        return result
+    }
+    const getPowerMode = () => getCcbConfig().powerMode
+    const getLiveMode = () => getCcbConfig().liveMode
+
+    function getCcbConfig() {
+        const contextKey = getContextKey()
+        if (ccbConfigCache && ccbConfigCache.contextKey === contextKey) return ccbConfigCache
+
+        const storedNode = getTargetCdnNode(contextKey)
+        // 存储被写坏时退回默认源，避免后续字符串操作抛错
+        const node = typeof storedNode === 'string' ? storedNode : defaultCdnNode
+        const region = getRegion(contextKey)
+        const powerMode = GM_getValue(powerModeStored, true)
+        const liveMode = GM_getValue(liveModeStored, false)
+        let replacement = node
+        if (replacement.indexOf('://') === -1) replacement = 'https://' + replacement
+        if (!replacement.endsWith('/')) replacement = replacement + '/'
+        const replacementNoSlash = replacement.endsWith('/') ? replacement.slice(0, -1) : replacement
+        let replacementHost
+        try {
+            replacementHost = new URL(replacement).host
+        } catch (_) {
+            replacementHost = ''
+        }
+        ccbConfigCache = { contextKey, node, region, powerMode, liveMode, replacement, replacementNoSlash, replacementHost }
+        return ccbConfigCache
+    }
+
+    const isCcbEnabled = () => getCcbConfig().node !== defaultCdnNode
     const hasMediaDomain = (s) => typeof s === 'string' && (
         s.indexOf('bilivideo.') !== -1
         || s.indexOf('acgvideo.') !== -1
@@ -108,10 +165,11 @@
     }
 
     const shouldApplyReplacement = () => {
-        if (!isCcbEnabled()) return false
+        const config = getCcbConfig()
+        if (config.node === defaultCdnNode) return false
         if (location.host === liveHost) {
             if (!isLiveRoomPage()) return false
-            if (!getLiveMode()) return false
+            if (!config.liveMode) return false
         }
         return true
     }
@@ -129,45 +187,132 @@
         return false
     }
 
-    const getReplacement = () => {
-        let target = getTargetCdnNode()
-        if (target.indexOf('://') === -1) target = 'https://' + target
-        if (!target.endsWith('/')) target = target + '/'
-        return target
-    }
+    const getReplacement = () => getCcbConfig().replacement
 
-    const getReplacementNoSlash = () => {
-        const r = getReplacement()
-        return r.endsWith('/') ? r.slice(0, -1) : r
-    }
+    const getReplacementNoSlash = () => getCcbConfig().replacementNoSlash
 
-    const getReplacementHost = () => {
+    const getReplacementHost = () => getCcbConfig().replacementHost
+
+    const statsFreshMs = 60000
+    const statsFlushMs = 2000
+    const isTopFrame = window.top === window
+    const ccbFrameId = Math.random().toString(36).slice(2)
+    // 只统计页面框架内的改写,Worker 运行时内部的改写没有回传通道,不计入
+    const ccbRewriteStats = { host: null, count: 0 }
+    let statsFlushTimer = null
+
+    // malformed 表示存储里是坏值,调用方负责把重置后的空对象写回
+    const readStatsStore = () => {
+        let store
         try {
-            return new URL(getReplacement()).host
+            store = GM_getValue(statsStored, {})
+            if (typeof store === 'string') store = JSON.parse(store)
         } catch (_) {
-            return ''
+            return { store: {}, malformed: true }
         }
+        if (!store || typeof store !== 'object' || Array.isArray(store)) return { store: {}, malformed: true }
+        return { store, malformed: false }
+    }
+
+    // 删掉坏值、过期以及时间戳来自未来的条目,返回是否改动过 store
+    const pruneStatsStore = (store, now) => {
+        let pruned = false
+        for (const key in store) {
+            if (!Object.prototype.hasOwnProperty.call(store, key)) continue
+            const entry = store[key]
+            const ts = entry && typeof entry === 'object' ? entry.ts : NaN
+            if (!Number.isFinite(ts) || now - ts > statsFreshMs || now - ts < 0) {
+                delete store[key]
+                pruned = true
+            }
+        }
+        return pruned
+    }
+
+    const flushRewriteStats = () => {
+        statsFlushTimer = null
+        try {
+            const now = Date.now()
+            const { store } = readStatsStore()
+            // 每次回写都顺手清理,否则关掉的框架会一直留在存储里
+            pruneStatsStore(store, now)
+            store[ccbFrameId] = { host: ccbRewriteStats.host, count: ccbRewriteStats.count, ts: now }
+            GM_setValue(statsStored, store)
+        } catch (_) {}
+    }
+
+    // 改写路径上只累加内存计数,写存储由一次性定时器合并
+    const countRewrite = (before, after) => {
+        if (after === before) return after
+        ccbRewriteStats.count++
+        ccbRewriteStats.host = getReplacementHost() || ccbRewriteStats.host
+        if (!isTopFrame && !statsFlushTimer) statsFlushTimer = setTimeout(flushRewriteStats, statsFlushMs)
+        return after
+    }
+
+    const readAggregateStats = () => {
+        const now = Date.now()
+        const { store, malformed } = readStatsStore()
+        const pruned = pruneStatsStore(store, now) || malformed
+        let count = ccbRewriteStats.count
+        let freshestTs = 0
+        let freshestHost = ''
+        for (const key in store) {
+            if (!Object.prototype.hasOwnProperty.call(store, key)) continue
+            const entry = store[key]
+            if (Number.isFinite(entry.count)) count += entry.count
+            if (entry.ts >= freshestTs && typeof entry.host === 'string' && entry.host) {
+                freshestTs = entry.ts
+                freshestHost = entry.host
+            }
+        }
+        if (pruned) {
+            try { GM_setValue(statsStored, store) } catch (_) {}
+        }
+        return { count, host: ccbRewriteStats.host || freshestHost }
     }
 
     const IGNORE_HOST_RE = /^(?:bvc|data|pbp|api|api\w+)\./
+    const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)(?:\/|$)/i
+    function isIgnoredHost(s) {
+        const m = HOST_EXTRACT_RE.exec(s)
+        const host = m && (m[1] || m[2])
+        return !!host && IGNORE_HOST_RE.test(host.toLowerCase())
+    }
+
+    const replaceMediaUrlCore = (s) => {
+        let out = s
+        if (s.startsWith('http://') || s.startsWith('https://')) out = s.replace(/^https?:\/\/.*?\//, getReplacement())
+        else if (s.startsWith('//')) out = s.replace(/^\/\/.*?\//, getReplacement().replace(/^https?:/, ''))
+        else if (/^[^/]+\//.test(s)) out = s.replace(/^[^/]+\//, `${getReplacementHost()}/`)
+        return countRewrite(s, out)
+    }
+
+    const replaceMediaUrlUnchecked = (s) => {
+        if (isIgnoredHost(s)) return s
+        return replaceMediaUrlCore(s)
+    }
 
     const replaceMediaUrl = (s) => {
         if (typeof s !== 'string') return s
         if (!shouldApplyReplacement()) return s
         if (!hasMediaDomain(s)) return s
 
-        try {
-            const u = new URL(s.startsWith('//') ? `https:${s}` : s)
-            if (IGNORE_HOST_RE.test(u.hostname)) return s
-        } catch (_) {
-            const m = s.match(/^https?:\/\/([\w.-]+)/) || s.match(/^\/\/([\w.-]+)/)
-            if (m && IGNORE_HOST_RE.test(m[1])) return s
-        }
+        if (isIgnoredHost(s)) return s
+        return replaceMediaUrlCore(s)
+    }
 
-        if (s.startsWith('http://') || s.startsWith('https://')) return s.replace(/^https?:\/\/.*?\//, getReplacement())
-        if (s.startsWith('//')) return s.replace(/^\/\/.*?\//, getReplacement().replace(/^https?:/, ''))
-        if (/^[^/]+\//.test(s)) return s.replace(/^[^/]+\//, `${getReplacementHost()}/`)
-        return s
+    const replaceMediaHostValueCore = (s) => {
+        let out = s
+        if (s.startsWith('http://') || s.startsWith('https://')) out = getReplacementNoSlash()
+        else if (s.startsWith('//')) out = getReplacementNoSlash().replace(/^https?:/, '')
+        else if (/^[^/]+$/.test(s)) out = getReplacementHost()
+        return countRewrite(s, out)
+    }
+
+    const replaceMediaHostValueUnchecked = (s) => {
+        if (isIgnoredHost(s)) return s
+        return replaceMediaHostValueCore(s)
     }
 
     const replaceMediaHostValue = (s) => {
@@ -175,18 +320,8 @@
         if (!shouldApplyReplacement()) return s
         if (!hasMediaDomain(s)) return s
 
-        try {
-            const u = new URL(s.startsWith('//') ? `https:${s}` : s)
-            if (IGNORE_HOST_RE.test(u.hostname)) return s
-        } catch (_) {
-            const m = s.match(/^https?:\/\/([\w.-]+)/) || s.match(/^\/\/([\w.-]+)/)
-            if (m && IGNORE_HOST_RE.test(m[1])) return s
-        }
-
-        if (s.startsWith('http://') || s.startsWith('https://')) return getReplacementNoSlash()
-        if (s.startsWith('//')) return getReplacementNoSlash().replace(/^https?:/, '')
-        if (/^[^/]+$/.test(s)) return getReplacementHost()
-        return s
+        if (isIgnoredHost(s)) return s
+        return replaceMediaHostValueCore(s)
     }
 
     const deepReplacePlayInfo = (obj) => {
@@ -195,7 +330,7 @@
             for (let i = 0; i < obj.length; i++) {
                 const item = obj[i]
                 if (typeof item === 'string') {
-                    const out = hasMediaDomain(item) ? replaceMediaUrl(item) : item
+                    const out = hasMediaDomain(item) ? replaceMediaUrlUnchecked(item) : item
                     if (out !== item) obj[i] = out
                 } else {
                     deepReplacePlayInfo(item)
@@ -208,16 +343,16 @@
             const v = obj[k]
             if (typeof v === 'string') {
                 if (k === 'host') {
-                    if (hasMediaDomain(v)) obj[k] = replaceMediaHostValue(v)
+                    if (hasMediaDomain(v)) obj[k] = replaceMediaHostValueUnchecked(v)
                 } else {
-                    if (hasMediaDomain(v)) obj[k] = replaceMediaUrl(v)
+                    if (hasMediaDomain(v)) obj[k] = replaceMediaUrlUnchecked(v)
                 }
             } else if (Array.isArray(v) && k === 'backup_url') {
                 if (!getPowerMode()) continue
                 for (let i = 0; i < v.length; i++) {
                     const s = v[i]
                     if (typeof s === 'string') {
-                        if (hasMediaDomain(s)) v[i] = replaceMediaUrl(s)
+                        if (hasMediaDomain(s)) v[i] = replaceMediaUrlUnchecked(s)
                     }
                     else deepReplacePlayInfo(s)
                 }
@@ -228,6 +363,7 @@
     }
 
     const transformPlayUrlResponse = (playInfo) => {
+        if (!shouldApplyReplacement()) return
         if (!playInfo || typeof playInfo !== 'object') return
         if (playInfo.code !== (void 0) && playInfo.code !== 0) return
         deepReplacePlayInfo(playInfo)
@@ -287,7 +423,13 @@
         const Replacement = (cfg && typeof cfg.replacement === 'string') ? cfg.replacement : ''
         const replacementHost = (cfg && typeof cfg.replacementHost === 'string') ? cfg.replacementHost : ''
         const getHost = () => replacementHost
-        const IgnoreHostRe = /^(?:bvc|data|pbp|api|api\w+)\./
+        const IGNORE_HOST_RE = /^(?:bvc|data|pbp|api|api\w+)\./
+        const HOST_EXTRACT_RE = /^(?:https?:)?\/\/([\w.-]+)|^([\w.-]+)(?:\/|$)/i
+        function isIgnoredHost(s) {
+            const m = HOST_EXTRACT_RE.exec(s)
+            const host = m && (m[1] || m[2])
+            return !!host && IGNORE_HOST_RE.test(host.toLowerCase())
+        }
         const hasMedia = (s) => typeof s === 'string' && (
             s.indexOf('bilivideo.') !== -1
             || s.indexOf('acgvideo.') !== -1
@@ -299,13 +441,7 @@
             if (typeof s !== 'string') return s
             if (!shouldApply()) return s
             if (!hasMedia(s)) return s
-            try {
-                const u = new URL(s.startsWith('//') ? `https:${s}` : s)
-                if (IgnoreHostRe.test(u.hostname)) return s
-            } catch (_) {
-                const m = s.match(/^https?:\/\/([\w.-]+)/) || s.match(/^\/\/([\w.-]+)/)
-                if (m && IgnoreHostRe.test(m[1])) return s
-            }
+            if (isIgnoredHost(s)) return s
             if (s.startsWith('http://') || s.startsWith('https://')) return s.replace(/^https?:\/\/.*?\//, Replacement)
             if (s.startsWith('//')) return s.replace(/^\/\/.*?\//, Replacement.replace(/^https?:/, ''))
             if (/^[^/]+\//.test(s)) return s.replace(/^[^/]+\//, `${getHost()}/`)
@@ -347,18 +483,25 @@
     }
 
     const buildWorkerPrelude = () => {
+        const contextKey = getContextKey()
+        if (workerPreludeCache && workerPreludeContextKey === contextKey) return workerPreludeCache
+
         const cfg = {
             forceReplace: shouldApplyReplacement(),
             replacement: getReplacement(),
             replacementHost: getReplacementHost(),
         }
         const runtime = `(${installCcbWorkerRuntime.toString()})(${JSON.stringify(cfg)});`
-        return `(() => {\n` +
+        workerPreludeContextKey = contextKey
+        workerPreludeCache = `(() => {\n` +
             `  if (self.__CCB_WORKER_PRELUDE__) return;\n` +
             `  self.__CCB_WORKER_PRELUDE__ = true;\n` +
             `  try { ${runtime} } catch (_) {}\n` +
             `})();\n`
+        return workerPreludeCache
     }
+
+    const xhrMemoUnset = {}
 
     const interceptNetResponse = (theWindow => {
         const interceptors = []
@@ -378,18 +521,31 @@
                 const OX = w.XMLHttpRequest
                 class XHR extends OX {
                     open(...args) {
+                        this._ccbIntercept = false
+                        this._ccbResponseMemo = xhrMemoUnset
+                        this._ccbResponseTextMemo = xhrMemoUnset
                         try {
                             if (typeof args[1] === 'string') args[1] = replaceMediaUrl(args[1])
+                            this._ccbIntercept = !!handle(null, args[1], { type: 'xhr', xhr: this })
                         } catch (_) {}
                         return super.open(...args)
                     }
                     get responseText() {
-                        if (this.readyState !== this.DONE) return super.responseText
-                        return handle(super.responseText, this.responseURL, { type: 'xhr', xhr: this })
+                        if (!this._ccbIntercept || this.readyState !== this.DONE) return super.responseText
+                        if (this._ccbResponseTextMemo !== xhrMemoUnset) return this._ccbResponseTextMemo
+                        const value = handle(super.responseText, this.responseURL, { type: 'xhr', xhr: this })
+                        this._ccbResponseTextMemo = value
+                        return value
                     }
                     get response() {
-                        if (this.readyState !== this.DONE) return super.response
-                        return handle(super.response, this.responseURL, { type: 'xhr', xhr: this })
+                        if (!this._ccbIntercept || this.readyState !== this.DONE) return super.response
+                        // responseType 为 '' 或 'text' 时 response 就是 responseText,复用同一份缓存避免重复处理
+                        const rt = this.responseType
+                        if (rt === '' || rt === 'text') return this.responseText
+                        if (this._ccbResponseMemo !== xhrMemoUnset) return this._ccbResponseMemo
+                        const value = handle(super.response, this.responseURL, { type: 'xhr', xhr: this })
+                        this._ccbResponseMemo = value
+                        return value
                     }
                 }
                 w.XMLHttpRequest = XHR
@@ -406,17 +562,29 @@
                     }
 
                     const s = typeof input === 'string' ? input : (input && input.url)
-                    let resolvedUrl = s
-                    try { resolvedUrl = new URL(s, w.location && w.location.href ? w.location.href : location.href).href } catch (_) {}
-
-                    const shouldIntercept = handle(null, resolvedUrl, { type: 'fetch', input, init })
+                    const shouldIntercept = handle(null, s, { type: 'fetch', input, init })
                     if (!shouldIntercept) return Ofetch(input, init)
-                    return Ofetch(input, init).then(resp => new Promise((resolve) => {
-                        resp.text().then(text => {
-                            const out = handle(text, resolvedUrl, { type: 'fetch', input, init, response: resp })
-                            resolve(new (w.Response || Response)(out, { status: resp.status, statusText: resp.statusText, headers: resp.headers }))
+                    return Ofetch(input, init).then(resp => {
+                        // 老引擎没有 Response.body 属性,不能把"属性缺失"当成"空响应体"
+                        if (('body' in resp && !resp.body) || resp.status === 204 || resp.status === 205 || resp.status === 304) return resp
+                        return resp.text().then(text => {
+                            let out = text
+                            try {
+                                out = handle(text, s, { type: 'fetch', input, init, response: resp })
+                            } catch (e) {
+                                logger('处理响应失败:', e)
+                            }
+                            // 重建响应会让原来的 content-length 失真,url/redirected 也会丢失,尽量补回
+                            let headers = resp.headers
+                            try { headers = new (w.Headers || Headers)(resp.headers); headers.delete('content-length') } catch (_) {}
+                            const next = new (w.Response || Response)(out, { status: resp.status, statusText: resp.statusText, headers })
+                            try {
+                                Object.defineProperty(next, 'url', { value: resp.url, configurable: true })
+                                Object.defineProperty(next, 'redirected', { value: resp.redirected, configurable: true })
+                            } catch (_) {}
+                            return next
                         })
-                    }))
+                    })
                 }
 
                 try {
@@ -424,10 +592,11 @@
                     if (w.Blob && (!bHooked || bHooked !== w.Blob)) {
                         const OBlob = w.Blob
                         w.Blob = function (parts, options) {
+                            if (!shouldInstallWorkerHooks()) return new OBlob(parts, options)
                             const type = options && options.type ? String(options.type) : ''
                             const looksJs = /javascript/i.test(type)
                                 || (Array.isArray(parts) && parts.some(p => typeof p === 'string' && /importScripts|WorkerGlobalScope|bili/i.test(p)))
-                            if (looksJs && shouldInstallWorkerHooks()) {
+                            if (looksJs) {
                                 const injected = [buildWorkerPrelude(), ...(Array.isArray(parts) ? parts : [parts])]
                                 return new OBlob(injected, options)
                             }
@@ -474,20 +643,12 @@
         return register
     })(unsafeWindow)
 
-    const PLAYURL_PATHS = [
-        '/x/player/wbi/playurl',
-        '/x/player/playurl',
-        '/pgc/player/web/playurl',
-        '/pgc/player/web/v2/playurl',
-        '/pgc/player/api/playurl',
-        '/pugv/player/web/playurl',
-        '/ogv/player/playview',
-    ]
+    const PLAYURL_PATH_RE = /(?:\/x\/player\/wbi\/playurl|\/x\/player\/playurl|\/pgc\/player\/web\/playurl|\/pgc\/player\/web\/v2\/playurl|\/pgc\/player\/api\/playurl|\/pugv\/player\/web\/playurl|\/ogv\/player\/playview)/
 
     interceptNetResponse((response, url) => {
         if (!isCcbEnabled()) return
         const u = typeof url === 'string' ? url : (url && url.url) || String(url)
-        if (!PLAYURL_PATHS.some(p => u.includes(p))) return
+        if (!PLAYURL_PATH_RE.test(u)) return
         if (response === null) return true
 
         try {
@@ -507,7 +668,8 @@
 
     interceptNetResponse((response, url) => {
         if (!isCcbEnabled()) return
-        if (!getLiveMode()) return
+        const config = getCcbConfig()
+        if (!config.liveMode) return
         const raw = typeof url === 'string' ? url : (url && url.url) || ''
         let u
         try { u = new URL(raw || String(url), location.href) } catch (_) { return }
@@ -526,7 +688,8 @@
 
     interceptNetResponse((response, url) => {
         if (!isCcbEnabled()) return
-        if (!getLiveMode()) return
+        const config = getCcbConfig()
+        if (!config.liveMode) return
         const u = typeof url === 'string' ? url : (url && url.url) || String(url)
         if (!u.includes('/xlive/play-gateway/master/url')) return
         if (response === null) return true
@@ -602,6 +765,50 @@
     let regionList = [manualRegionName]
     let cdnDataCache = null
 
+    // CDN 数据必须是 { 地区: 节点数组 },任一地区值不是数组就整体作废
+    const isCdnData = (data) => !!data
+        && typeof data === 'object'
+        && !Array.isArray(data)
+        && Object.values(data).every(Array.isArray)
+
+    const readStoredEntry = (key, isData) => {
+        let entry
+        try {
+            entry = GM_getValue(key, null)
+            if (typeof entry === 'string') entry = JSON.parse(entry)
+        } catch (_) {
+            return null
+        }
+        const ok = entry
+            && typeof entry === 'object'
+            && !Array.isArray(entry)
+            && Number.isFinite(entry.fetchedAt)
+            && isData(entry.data)
+        return ok ? entry : null
+    }
+
+    const getStoredDataCache = () => ({
+        region: readStoredEntry(regionCacheStored, data => Array.isArray(data) && data.every(v => typeof v === 'string')),
+        cdn: readStoredEntry(cdnCacheStored, isCdnData),
+    })
+
+    const getRegionOptions = (regions) => [manualRegionName, ...regions.filter(v => v && v !== manualRegionName && v !== '编辑')]
+
+    const loadDataCache = () => {
+        const dataCache = getStoredDataCache()
+        regionList = dataCache.region ? getRegionOptions(dataCache.region.data) : [manualRegionName]
+        cdnDataCache = dataCache.cdn ? dataCache.cdn.data : null
+        return dataCache
+    }
+
+    const storeRegionData = (data) => {
+        GM_setValue(regionCacheStored, { data, fetchedAt: Date.now() })
+    }
+
+    const storeCdnData = (data) => {
+        GM_setValue(cdnCacheStored, { data, fetchedAt: Date.now() })
+    }
+
     const requestText = (url) => new Promise((resolve, reject) => {
         const fetchFallback = () => fetch(url).then(r => r.text()).then(resolve, reject)
         try {
@@ -625,29 +832,116 @@
 
     const requestJson = async (url) => JSON.parse(await requestText(url))
 
-    const getRegionList = async () => {
+    const appendOption = (parent, value) => {
+        const opt = document.createElement('option')
+        opt.value = value
+        opt.textContent = value
+        parent.appendChild(opt)
+    }
+
+    // 优先恢复已保存的选择,其次沿用当前选中项,都不在列表里时显式回落,不依赖浏览器的隐式首项
+    const applySelectValue = (selectEl, values, preferred, current, fallback) => {
+        if (!values.length) return
+        if (values.includes(preferred)) selectEl.value = preferred
+        else if (values.includes(current)) selectEl.value = current
+        else selectEl.value = values.includes(fallback) ? fallback : values[0]
+    }
+
+    const renderRegionOptions = (selectEl, regions, preferred) => {
+        const current = selectEl.value
+        selectEl.textContent = ''
+        for (const v of regions) appendOption(selectEl, v)
+        applySelectValue(selectEl, regions, preferred, current)
+    }
+
+    const CDN_NODE_RE = /^cn-([a-z0-9]+)-([a-z0-9]+)-/
+    // 只有这三个是运营商缩写,其余 token 原样展示
+    const ispLabelMap = { cm: '移动', ct: '电信', cu: '联通' }
+
+    // 仅用于下拉框展示分组,不改变节点列表本身
+    const groupCdnNodes = (list) => {
+        const groups = []
+        const byLabel = new Map()
+        const ungrouped = []
+        for (const node of list) {
+            const m = typeof node === 'string' ? CDN_NODE_RE.exec(node) : null
+            if (!m) {
+                ungrouped.push(node)
+                continue
+            }
+            const label = `${m[1]} · ${ispLabelMap[m[2]] || m[2]}`
+            let group = byLabel.get(label)
+            if (!group) {
+                group = { label, nodes: [] }
+                byLabel.set(label, group)
+                groups.push(group)
+            }
+            group.nodes.push(node)
+        }
+        // 未分组项含列表首项(使用默认源)时置顶,否则置尾
+        if (ungrouped.length) {
+            const bucket = { label: null, nodes: ungrouped }
+            if (ungrouped[0] === list[0]) groups.unshift(bucket)
+            else groups.push(bucket)
+        }
+        return groups
+    }
+
+    const renderNodeOptions = (selectEl, nodes, preferred) => {
+        const current = selectEl.value
+        selectEl.textContent = ''
+        for (const group of groupCdnNodes(nodes)) {
+            if (!group.label) {
+                for (const v of group.nodes) appendOption(selectEl, v)
+                continue
+            }
+            const optgroup = document.createElement('optgroup')
+            optgroup.label = group.label
+            for (const v of group.nodes) appendOption(optgroup, v)
+            selectEl.appendChild(optgroup)
+        }
+        applySelectValue(selectEl, nodes, preferred, current, defaultCdnNode)
+    }
+
+    // onSuccess 放在 try 外,避免重绘异常被当成请求失败吞掉
+    const getRegionList = async (onSuccess) => {
+        let ok = false
         try {
             const data = await requestJson(`${api}/region.json`)
-            if (Array.isArray(data)) regionList = [manualRegionName, ...data.filter(v => v && v !== manualRegionName && v !== '编辑')]
+            if (!Array.isArray(data)) return
+            const regions = data.filter(v => typeof v === 'string')
+            regionList = getRegionOptions(regions)
+            storeRegionData(regions)
+            ok = true
         } catch (_) {}
+        if (ok && onSuccess) onSuccess()
     }
 
-    const getCdnData = async () => {
-        if (cdnDataCache) return cdnDataCache
+    const getCdnData = async (onSuccess) => {
+        let ok = false
         try {
-            cdnDataCache = await requestJson(`${api}/cdn.json`)
+            const data = await requestJson(`${api}/cdn.json`)
+            if (!isCdnData(data)) throw new TypeError('无效 CDN 数据')
+            cdnDataCache = data
+            storeCdnData(data)
+            ok = true
         } catch (_) {
-            cdnDataCache = {}
+            if (!cdnDataCache) cdnDataCache = {}
         }
-        return cdnDataCache
+        if (ok && onSuccess) onSuccess()
     }
 
-    const getCdnListByRegion = async (region) => {
+    const getCdnListByRegion = (region) => {
         if (region === manualRegionName || region === '编辑') return [defaultCdnNode]
-        const data = await getCdnData()
-        const regionData = (data && data[region]) || []
+        const data = cdnDataCache || {}
+        const regionData = Array.isArray(data[region]) ? data[region].filter(v => typeof v === 'string') : []
         return [defaultCdnNode, ...regionData]
     }
+
+    // 首次打开需要等待网络,期间再次触发菜单会重复插入面板,用标记挡住并发调用
+    let panelOpening = false
+    // 请求可能一直不回调,等待设上限,超时后先渲染,迟到的响应仍由后台重绘补上
+    const panelDataWaitMs = 8000
 
     const openPanel = async () => {
         const existing = document.querySelector('#ccb-settings-panel')
@@ -655,10 +949,37 @@
             existing.remove()
             return
         }
+        if (panelOpening) return
+        panelOpening = true
 
-        await getRegionList()
+        let root = null
+        const panelControls = []
+        try {
+            const dataCache = loadDataCache()
+            const isPanelOpen = () => root && root.isConnected
+            const rerenderRegions = () => {
+                if (!isPanelOpen()) return
+                for (const controls of panelControls) controls.renderRegions()
+            }
+            const rerenderNodes = () => {
+                if (!isPanelOpen()) return
+                for (const controls of panelControls) controls.renderNodes()
+            }
+            const regionRequest = getRegionList(rerenderRegions)
+            const cdnRequest = getCdnData(rerenderNodes)
+            // 只等待本地没有存档的资源,已有存档的先渲染再后台刷新
+            const pending = []
+            if (!dataCache.region) pending.push(regionRequest)
+            if (!dataCache.cdn) pending.push(cdnRequest)
+            if (pending.length) await Promise.race([
+                Promise.all(pending),
+                new Promise(resolve => setTimeout(resolve, panelDataWaitMs)),
+            ])
+        } finally {
+            panelOpening = false
+        }
 
-        const root = document.createElement('div')
+        root = document.createElement('div')
         root.id = 'ccb-settings-panel'
         root.style.cssText = [
             'position:fixed',
@@ -716,16 +1037,10 @@
             return box
         }
 
-        const mkSelect = (options, value) => {
+        const mkSelect = (options, value, renderOptions) => {
             const sel = document.createElement('select')
             sel.style.cssText = 'flex:1;background:#111;color:#fff;border:1px solid #333;border-radius:8px;padding:8px'
-            for (const v of options) {
-                const opt = document.createElement('option')
-                opt.value = v
-                opt.textContent = v
-                sel.appendChild(opt)
-            }
-            sel.value = value
+            renderOptions(sel, options, value)
             return sel
         }
 
@@ -738,12 +1053,14 @@
             return inp
         }
 
-        const mountRegionAndNode = async (ctx, hostBox) => {
+        const mountRegionAndNode = (ctx, hostBox) => {
             const region = getRegion(ctx)
             let nodeValue = getTargetCdnNode(ctx)
+            let nodeSelect = null
+            let nodeInput = null
 
             const { row: regionRow } = mkRow('地区')
-            const regionSelect = mkSelect(regionList, region)
+            const regionSelect = mkSelect(regionList, region, renderRegionOptions)
             regionRow.appendChild(regionSelect)
             hostBox.appendChild(regionRow)
 
@@ -751,14 +1068,25 @@
             hostBox.appendChild(nodeRow)
 
             const clearRowControl = () => {
+                if (nodeSelect) nodeValue = nodeSelect.value
                 while (nodeRow.childNodes.length > 1) nodeRow.removeChild(nodeRow.lastChild)
+                nodeSelect = null
+                nodeInput = null
             }
 
-            const renderNodeControl = async (regionValue) => {
-                clearRowControl()
+            // 已保存的节点不在列表里时补进选项,保证显示与存储一致(不写入存储)
+            const withStoredNode = (list, stored) => (stored && typeof stored === 'string' && !list.includes(stored))
+                ? [...list, stored]
+                : list
 
+            // persist 仅在用户操作时为 true,后台刷新重绘不写入存储
+            const renderNodeControl = (regionValue, persist) => {
+                const stored = getTargetCdnNode(ctx)
                 if (regionValue === manualRegionName) {
-                    const inp = mkInput(nodeValue === defaultCdnNode ? '' : nodeValue)
+                    if (nodeInput) return
+                    clearRowControl()
+                    const inp = mkInput(stored === defaultCdnNode ? '' : stored)
+                    nodeInput = inp
                     nodeRow.appendChild(inp)
                     inp.addEventListener('input', () => {
                         const v = inp.value.trim()
@@ -768,39 +1096,64 @@
                     return
                 }
 
-                const list = await getCdnListByRegion(regionValue)
-                if (!list.includes(nodeValue)) nodeValue = defaultCdnNode
-                setTargetCdnNode(ctx, nodeValue)
-                const sel = mkSelect(list, nodeValue)
+                const list = getCdnListByRegion(regionValue)
+                // 用户切换地区时按列表回落并写入,其余场景只如实展示已保存的节点
+                const options = persist ? list : withStoredNode(list, stored)
+                if (nodeSelect) {
+                    renderNodeOptions(nodeSelect, options, stored)
+                    nodeValue = nodeSelect.value
+                    if (persist) setTargetCdnNode(ctx, nodeValue)
+                    return
+                }
+                clearRowControl()
+                const sel = mkSelect(options, options.includes(stored) ? stored : defaultCdnNode, renderNodeOptions)
+                nodeSelect = sel
+                nodeValue = sel.value
                 nodeRow.appendChild(sel)
                 sel.addEventListener('change', () => {
                     nodeValue = sel.value
                     setTargetCdnNode(ctx, nodeValue)
                 })
+                if (persist) setTargetCdnNode(ctx, nodeValue)
             }
 
-            await renderNodeControl(regionSelect.value)
-            regionSelect.addEventListener('change', async () => {
+            renderNodeControl(regionSelect.value, false)
+            regionSelect.addEventListener('change', () => {
                 const next = regionSelect.value
                 setRegion(ctx, next)
-                await renderNodeControl(next)
+                renderNodeControl(next, true)
+            })
+            panelControls.push({
+                renderRegions: () => {
+                    renderRegionOptions(regionSelect, regionList, getRegion(ctx))
+                    renderNodeControl(regionSelect.value, false)
+                },
+                renderNodes: () => { renderNodeControl(regionSelect.value, false) },
             })
         }
+
+        const stats = readAggregateStats()
+        const statsLine = document.createElement('div')
+        statsLine.style.cssText = 'color:#9c9;margin:0 0 8px'
+        statsLine.textContent = stats.host
+            ? `已改写 ${stats.count} 个媒体请求 → ${stats.host}`
+            : `已改写 ${stats.count} 个媒体请求`
+        body.appendChild(statsLine)
 
         const mainBox = mkSectionBox()
         mainBox.appendChild(mkSectionTitle('视频 | 课堂 | 番剧(需特殊设置)'))
         body.appendChild(mainBox)
-        await mountRegionAndNode('main', mainBox)
+        mountRegionAndNode('main', mainBox)
 
         const liveBox = mkSectionBox()
         liveBox.appendChild(mkSectionTitle('直播'))
         body.appendChild(liveBox)
-        await mountRegionAndNode('live', liveBox)
+        mountRegionAndNode('live', liveBox)
 
         const diagnosticsBox = mkSectionBox()
         diagnosticsBox.appendChild(mkSectionTitle('测速'))
         body.appendChild(diagnosticsBox)
-        await mountRegionAndNode('diagnostics', diagnosticsBox)
+        mountRegionAndNode('diagnostics', diagnosticsBox)
 
         const actions = document.createElement('div')
         actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px'
@@ -808,12 +1161,14 @@
         powerBtn.addEventListener('click', () => {
             const next = !getPowerMode()
             GM_setValue(powerModeStored, next)
+            invalidateCcbCaches()
             powerBtn.textContent = next ? '强力替换模式：ON' : '强力替换模式：OFF'
         })
         const liveBtn = createButton(getLiveMode() ? '适用直播和番剧：ON' : '适用直播和番剧：OFF', true, false)
         liveBtn.addEventListener('click', () => {
             const next = !getLiveMode()
             GM_setValue(liveModeStored, next)
+            invalidateCcbCaches()
             liveBtn.textContent = next ? '适用直播和番剧：ON' : '适用直播和番剧：OFF'
         })
         const applyBtn = createButton('应用并刷新', false, true)
